@@ -35,10 +35,13 @@ campusswap/
 │   └── indexes_concurrency.sql  ← Stage 7: B+ tree indexes, concurrency control
 ├── scripts/
 │   └── generate_seed.py         ← Python script to generate seed.sql with Faker
+├── backend/
+│   ├── app.py                  ← Flask REST API connecting frontend to MySQL
+│   └── requirements.txt         ← flask, flask-cors, mysql-connector-python
 ├── frontend/
 │   ├── index.html               ← Marketplace UI with "How it Works" button
 │   ├── styles.css               ← Glassmorphic dark theme
-│   └── app.js                   ← Listings, search, SQL showcase modal
+│   └── app.js                   ← Listings, search, SQL showcase modal, API client
 ├── docs/
 │   └── er-design.md             ← ER diagram, mapping, viva Q&A
 └── README.md                    ← You are here
@@ -190,10 +193,10 @@ erDiagram
 git clone https://github.com/YOUR_USERNAME/campusswap-dbms.git
 cd campusswap-dbms
 
-# 2. Create the database and tables
+# 2. Create the database and tables in MySQL
 mysql -u root -p < sql/schema.sql
 
-# 3. Generate seed data
+# 3. Generate seed data (100 users, 500 listings, 300 orders)
 pip install faker
 cd scripts
 python generate_seed.py
@@ -202,14 +205,20 @@ cd ..
 # 4. Load seed data into MySQL
 mysql -u root -p < sql/seed.sql
 
-# 5. Run queries, procedures, triggers
+# 5. Run queries, views, procedures, and triggers
 mysql -u root -p campusswap < sql/queries.sql
 mysql -u root -p campusswap < sql/procedures_triggers.sql
 mysql -u root -p campusswap < sql/indexes_concurrency.sql
 
-# 6. Open the frontend
-# Just double-click frontend/index.html in your browser
-# Click "How it Works" to see all the SQL behind the UI!
+# 6. Start the Backend API (Connects Frontend directly to MySQL)
+pip install -r backend/requirements.txt
+python backend/app.py
+# Server runs on: http://localhost:5000
+
+# 7. Open the App in Browser:
+# Visit http://localhost:5000 (served directly by Flask)
+# OR double-click frontend/index.html
+# The frontend automatically detects the live MySQL connection!
 ```
 
 ---

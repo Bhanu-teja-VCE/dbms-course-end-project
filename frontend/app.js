@@ -4,68 +4,159 @@
 // that showcases every SQL query, procedure, trigger, and concept used.
 // ============================================================================
 
-// ---- SAMPLE DATA (simulates what the database returns) ----
+// ---- API BASE URL & CONNECTION STATE ----
+const API_BASE = 'http://localhost:5000/api';
+let backendConnected = false;
+
+// ---- FALLBACK SAMPLE DATA (used when backend is not running) ----
 const sampleListings = [
-    { id: 1, title: "Data Structures by Tanenbaum, 3rd Ed", price: 350, condition: "GOOD", seller: "Arjun S.", rating: 4.5, icon: "📘", category: "Engineering Books" },
-    { id: 2, title: "Casio fx-991EX Scientific Calculator", price: 850, condition: "LIKE_NEW", seller: "Priya M.", rating: 4.8, icon: "🔢", category: "Calculators" },
-    { id: 3, title: "SG Cricket Bat — English Willow", price: 2200, condition: "GOOD", seller: "Rohit K.", rating: 4.2, icon: "🏏", category: "Cricket" },
-    { id: 4, title: "DBMS by Navathe, 7th Edition", price: 280, condition: "FAIR", seller: "Sneha R.", rating: 3.9, icon: "📗", category: "Engineering Books" },
-    { id: 5, title: "JBL Tune 510BT Headphones", price: 1500, condition: "NEW", seller: "Vikram D.", rating: 4.7, icon: "🎧", category: "Electronics" },
-    { id: 6, title: "HP 15s Laptop Bag", price: 450, condition: "LIKE_NEW", seller: "Ananya P.", rating: 4.3, icon: "💼", category: "Accessories" },
-    { id: 7, title: "Operating Systems by Galvin, 9th Ed", price: 320, condition: "GOOD", seller: "Karthik V.", rating: 4.1, icon: "📕", category: "Engineering Books" },
-    { id: 8, title: "Yonex Badminton Racket — Nanoray", price: 1800, condition: "GOOD", seller: "Meera T.", rating: 4.6, icon: "🏸", category: "Badminton" },
+    { listing_id: 1, title: "Data Structures by Tanenbaum, 3rd Ed", price: 350, condition: "GOOD", seller_name: "Arjun Sharma", seller_rating: 4.5, category_name: "Engineering Books" },
+    { listing_id: 2, title: "Casio fx-991EX Scientific Calculator", price: 850, condition: "LIKE_NEW", seller_name: "Priya Mehta", seller_rating: 4.8, category_name: "Calculators" },
+    { listing_id: 3, title: "SG Cricket Bat — English Willow", price: 2200, condition: "GOOD", seller_name: "Rohit Kumar", seller_rating: 4.2, category_name: "Cricket" },
+    { listing_id: 4, title: "DBMS by Navathe, 7th Edition", price: 280, condition: "FAIR", seller_name: "Sneha Reddy", seller_rating: 3.9, category_name: "Engineering Books" },
+    { listing_id: 5, title: "JBL Tune 510BT Headphones", price: 1500, condition: "NEW", seller_name: "Vikram Desai", seller_rating: 4.7, category_name: "Electronics" },
+    { listing_id: 6, title: "HP 15s Laptop Bag", price: 450, condition: "LIKE_NEW", seller_name: "Ananya Patel", seller_rating: 4.3, category_name: "Accessories" },
+    { listing_id: 7, title: "Operating Systems by Galvin, 9th Ed", price: 320, condition: "GOOD", seller_name: "Karthik Verma", seller_rating: 4.1, category_name: "Engineering Books" },
+    { listing_id: 8, title: "Yonex Badminton Racket — Nanoray", price: 1800, condition: "GOOD", seller_name: "Meera Thomas", seller_rating: 4.6, category_name: "Badminton" },
 ];
 
 const sampleRequests = [
-    { id: 1, title: "Looking for DBMS by Navathe, any edition", user: "Rahul G.", budget: 300, status: "OPEN", hostel: "Block-C" },
-    { id: 2, title: "Need Casio fx-82 calculator for exam", user: "Divya S.", budget: 500, status: "OPEN", hostel: "Girls-Hostel-1" },
-    { id: 3, title: "Want study table in good condition", user: "Arun M.", budget: 1500, status: "FULFILLED", hostel: "Block-A" },
-    { id: 4, title: "Looking for COA by Morris Mano", user: "Pooja K.", budget: 250, status: "OPEN", hostel: "Girls-Hostel-2" },
-    { id: 5, title: "Need badminton shuttle cocks (Mavis 350)", user: "Sanjay R.", budget: 400, status: "OPEN", hostel: "Block-D" },
+    { request_id: 1, title: "Looking for DBMS by Navathe, any edition", user_name: "Rahul Gupta", budget_max: 300, status: "OPEN", hostel_block: "Block-C" },
+    { request_id: 2, title: "Need Casio fx-82 calculator for exam", user_name: "Divya Singh", budget_max: 500, status: "OPEN", hostel_block: "Girls-Hostel-1" },
+    { request_id: 3, title: "Want study table in good condition", user_name: "Arun Menon", budget_max: 1500, status: "FULFILLED", hostel_block: "Block-A" },
+    { request_id: 4, title: "Looking for COA by Morris Mano", user_name: "Pooja Krishnan", budget_max: 250, status: "OPEN", hostel_block: "Girls-Hostel-2" },
+    { request_id: 5, title: "Need badminton shuttle cocks (Mavis 350)", user_name: "Sanjay Rathore", budget_max: 400, status: "OPEN", hostel_block: "Block-D" },
 ];
 
+// Map category to icon
+const categoryIcons = {
+    'Books': '📚', 'Engineering Books': '📘', 'Medical Books': '📗', 'Fiction': '📙',
+    'Electronics': '💻', 'Calculators': '🔢', 'Earphones': '🎧',
+    'Sports': '🏏', 'Cricket': '🏏', 'Badminton': '🏸',
+    'Stationery': '✏️', 'Clothing': '👕', 'Furniture': '🪑', 'Accessories': '🎒',
+};
+
+function getCategoryIcon(catName) {
+    if (!catName) return '📦';
+    for (const [key, icon] of Object.entries(categoryIcons)) {
+        if (catName.toLowerCase().includes(key.toLowerCase())) return icon;
+    }
+    return '📦';
+}
+
+// ---- CHECK BACKEND HEALTH ----
+async function checkBackend() {
+    try {
+        const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(1500) });
+        const data = await res.json();
+        backendConnected = (data.status === 'ok');
+    } catch (e) {
+        backendConnected = false;
+    }
+
+    const badge = document.querySelector('.hero-badge');
+    if (badge) {
+        if (backendConnected) {
+            badge.innerHTML = '🟢 Connected to MySQL (Live Database)';
+            badge.style.borderColor = 'rgba(0, 184, 148, 0.4)';
+            badge.style.color = '#00B894';
+        } else {
+            badge.innerHTML = '🟡 Demo Mode (Static Data) — Start backend/app.py for Live DB';
+            badge.style.borderColor = 'rgba(253, 203, 110, 0.4)';
+            badge.style.color = '#FDCB6E';
+        }
+    }
+    return backendConnected;
+}
+
 // ---- RENDER LISTING CARDS ----
-function renderListings() {
+async function renderListings() {
     const grid = document.getElementById('listingsGrid');
     if (!grid) return;
 
-    grid.innerHTML = sampleListings.map(item => `
-        <div class="listing-card">
-            <div class="listing-image">${item.icon}</div>
+    let listings = sampleListings;
+
+    if (backendConnected) {
+        try {
+            const res = await fetch(`${API_BASE}/listings?status=ACTIVE`);
+            const data = await res.json();
+            if (data.listings && data.listings.length > 0) {
+                listings = data.listings.slice(0, 12);
+            }
+        } catch (err) {
+            console.warn('Using sample listings due to API fetch error:', err);
+        }
+    }
+
+    grid.innerHTML = listings.map(item => {
+        const title = item.title;
+        const price = Number(item.price);
+        const cond = (item.condition || 'GOOD').toLowerCase();
+        const seller = item.seller_name || item.seller || 'Seller';
+        const rating = item.seller_rating || item.rating || '4.0';
+        const cat = item.category_name || item.category || 'General';
+        const icon = getCategoryIcon(cat);
+
+        return `
+        <div class="listing-card" data-id="${item.listing_id || item.id}">
+            <div class="listing-image">${icon}</div>
             <div class="listing-info">
-                <div class="listing-title">${item.title}</div>
+                <div class="listing-title">${title}</div>
                 <div class="listing-meta">
-                    <span class="listing-price">₹${item.price.toLocaleString('en-IN')}</span>
-                    <span class="listing-condition condition-${item.condition.toLowerCase()}">${item.condition.replace('_', ' ')}</span>
+                    <span class="listing-price">₹${price.toLocaleString('en-IN')}</span>
+                    <span class="listing-condition condition-${cond}">${cond.replace('_', ' ')}</span>
                 </div>
                 <div class="listing-seller">
-                    <span class="seller-avatar">${item.seller[0]}</span>
-                    ${item.seller} · ${item.category}
+                    <span class="seller-avatar">${seller[0]}</span>
+                    ${seller} · ${cat}
                 </div>
             </div>
             <div class="listing-footer">
-                <span class="listing-rating">⭐ ${item.rating}</span>
-                <button class="btn btn-primary btn-small">View</button>
+                <span class="listing-rating">⭐ ${rating}</span>
+                <button class="btn btn-primary btn-small" onclick="handleBuyClick(${item.listing_id || item.id}, '${title.replace(/'/g, "\\'")}', ${price})">Buy</button>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // ---- RENDER REQUEST CARDS ----
-function renderRequests() {
+async function renderRequests() {
     const list = document.getElementById('requestsList');
     if (!list) return;
 
-    list.innerHTML = sampleRequests.map(req => `
+    let requests = sampleRequests;
+
+    if (backendConnected) {
+        try {
+            const res = await fetch(`${API_BASE}/requests`);
+            const data = await res.json();
+            if (data.requests && data.requests.length > 0) {
+                requests = data.requests.slice(0, 8);
+            }
+        } catch (err) {
+            console.warn('Using sample requests due to API fetch error:', err);
+        }
+    }
+
+    list.innerHTML = requests.map(req => {
+        const title = req.title;
+        const status = (req.status || 'OPEN').toLowerCase();
+        const user = req.user_name || req.user || 'Student';
+        const hostel = req.hostel_block || req.hostel || 'Campus';
+        const budget = Number(req.budget_max || req.budget || 0);
+
+        return `
         <div class="request-card">
-            <span class="request-status status-${req.status.toLowerCase()}">${req.status}</span>
+            <span class="request-status status-${status}">${status.toUpperCase()}</span>
             <div class="request-info">
-                <div class="request-title">${req.title}</div>
-                <div class="request-detail">${req.user} · ${req.hostel}</div>
+                <div class="request-title">${title}</div>
+                <div class="request-detail">${user} · ${hostel}</div>
             </div>
-            <span class="request-budget">≤ ₹${req.budget.toLocaleString('en-IN')}</span>
+            <span class="request-budget">≤ ₹${budget.toLocaleString('en-IN')}</span>
         </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // ---- HOW IT WORKS — SQL CONTENT FOR EACH TAB ----
@@ -624,7 +715,7 @@ function initModal() {
     });
 }
 
-// ---- SEARCH FILTER ----
+// ---- SEARCH & CATEGORY FILTER ----
 function initSearch() {
     const input = document.getElementById('searchInput');
     input?.addEventListener('input', () => {
@@ -632,8 +723,106 @@ function initSearch() {
         const cards = document.querySelectorAll('.listing-card');
         cards.forEach(card => {
             const title = card.querySelector('.listing-title')?.textContent.toLowerCase() || '';
-            card.style.display = title.includes(query) ? '' : 'none';
+            const cat = card.querySelector('.listing-seller')?.textContent.toLowerCase() || '';
+            card.style.display = (title.includes(query) || cat.includes(query)) ? '' : 'none';
         });
+    });
+
+    // Category cards click filter
+    document.querySelectorAll('.category-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const catName = card.querySelector('h3')?.textContent || '';
+            if (input) {
+                input.value = catName;
+                input.dispatchEvent(new Event('input'));
+            }
+            document.getElementById('listings')?.scrollIntoView({ behavior: 'smooth' });
+        });
+    });
+}
+
+// ---- SELL MODAL LOGIC ----
+function initSell() {
+    const sellOverlay = document.getElementById('sellOverlay');
+    const sellClose = document.getElementById('sellClose');
+    const sellForm = document.getElementById('sellForm');
+
+    function openSellModal() {
+        if (!currentUser) {
+            alert("Please log in first to list an item for sale!");
+            const loginOverlay = document.getElementById('loginOverlay');
+            loginOverlay?.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            if (typeof showLoginForm === 'function') showLoginForm();
+            return;
+        }
+        sellOverlay?.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeSellModal() {
+        sellOverlay?.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    // Attach to all Sell Now buttons (delegation)
+    document.addEventListener('click', (e) => {
+        if (e.target && e.target.textContent && e.target.textContent.trim() === 'Sell Now') {
+            e.preventDefault();
+            openSellModal();
+        }
+    });
+
+    sellClose?.addEventListener('click', closeSellModal);
+    sellOverlay?.addEventListener('click', (e) => {
+        if (e.target === sellOverlay) closeSellModal();
+    });
+
+    sellForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const title = document.getElementById('sellTitle').value.trim();
+        const catId = parseInt(document.getElementById('sellCategory').value);
+        const condition = document.getElementById('sellCondition').value;
+        const price = parseFloat(document.getElementById('sellPrice').value);
+        const qty = parseInt(document.getElementById('sellQty').value);
+
+        if (!title || isNaN(price) || price <= 0) {
+            alert("Please enter a valid title and positive price (CHECK constraint price > 0).");
+            return;
+        }
+
+        if (backendConnected) {
+            try {
+                const res = await fetch(`${API_BASE}/listings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        seller_id: currentUser.id,
+                        category_id: catId,
+                        title: title,
+                        price: price,
+                        quantity: qty,
+                        condition: condition,
+                        is_book: (catId === 1 || catId === 2)
+                    })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`✅ Listing Created Successfully in MySQL!\n\nExecuted SQL:\n${data.sql}\n\nNotice: Specialization ensured user #${currentUser.id} is now registered in SELLER table!`);
+                    sellForm.reset();
+                    closeSellModal();
+                    await renderListings();
+                } else {
+                    alert(`❌ Failed to create listing: ${data.error}`);
+                }
+            } catch (err) {
+                alert(`Error contacting backend: ${err.message}`);
+            }
+        } else {
+            alert(`✅ [Demo Mode] Listing Created Successfully!\n\nExecuted SQL:\nINSERT INTO LISTING (seller_id, category_id, title, price, quantity, condition, status)\nVALUES (${currentUser.id}, ${catId}, '${title}', ${price}, ${qty}, '${condition}', 'ACTIVE');\n\n(Start backend/app.py to save directly to MySQL database!)`);
+            sellForm.reset();
+            closeSellModal();
+        }
     });
 }
 
@@ -675,6 +864,47 @@ const avatarColors = [
 
 let currentUser = null; // tracks who is "logged in"
 
+// ---- BUY ACTION (Calls place_order ACID transaction procedure) ----
+async function handleBuyClick(listingId, title, price) {
+    if (!currentUser) {
+        alert("Please log in first to purchase an item!");
+        const loginOverlay = document.getElementById('loginOverlay');
+        loginOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        showLoginForm();
+        return;
+    }
+
+    const confirmed = confirm(`Confirm purchase:\n"${title}" for ₹${price}?\n\nThis will trigger the ACID place_order() stored procedure in MySQL!`);
+    if (!confirmed) return;
+
+    if (backendConnected) {
+        try {
+            const res = await fetch(`${API_BASE}/orders`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    buyer_id: currentUser.id,
+                    listing_id: listingId,
+                    quantity: 1,
+                    method: 'UPI'
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(`🎉 Order Placed Successfully via ACID Transaction!\n\nExecuted SQL:\n${data.sql}\n\nQuantity was decremented and status updated automatically via database triggers.`);
+                await renderListings();
+            } else {
+                alert(`❌ Order Failed: ${data.error || 'Check inventory or buyer profile'}`);
+            }
+        } catch (err) {
+            alert(`Error communicating with backend: ${err.message}`);
+        }
+    } else {
+        alert(`🎉 [Demo Mode] Order Placed Successfully!\n\nSQL Executed:\nCALL place_order(${currentUser.id}, ${listingId}, 1, 'UPI');\n\n(Start backend/app.py to run this live against MySQL!)`);
+    }
+}
+
 function initLogin() {
     const loginBtn = document.getElementById('loginBtn');
     const loginOverlay = document.getElementById('loginOverlay');
@@ -708,10 +938,38 @@ function initLogin() {
     });
 }
 
-function showLoginForm() {
+async function showLoginForm() {
     const body = document.getElementById('loginBody');
     const title = document.getElementById('loginModalTitle');
     title.textContent = '🔐 Student Login';
+
+    let users = sampleUsers;
+    if (backendConnected) {
+        try {
+            const res = await fetch(`${API_BASE}/users`);
+            const data = await res.json();
+            if (data.users && data.users.length > 0) {
+                users = data.users.map(u => ({
+                    id: u.user_id,
+                    name: u.name,
+                    email: u.email,
+                    phone: u.phone,
+                    hostel: u.hostel_block,
+                    room: u.room_no,
+                    isSeller: Boolean(u.is_seller),
+                    isBuyer: Boolean(u.is_buyer),
+                    upi: u.upi_id,
+                    totalSales: Number(u.total_sales || 0),
+                    avgRating: Number(u.avg_rating || 0),
+                    wallet: Number(u.wallet_balance || 0),
+                    listings: 0,
+                    orders: 0
+                }));
+            }
+        } catch (err) {
+            console.warn('Using sample users due to fetch error:', err);
+        }
+    }
 
     body.innerHTML = `
         <div class="login-form">
@@ -728,7 +986,7 @@ function showLoginForm() {
             <div class="login-divider">or pick a demo account</div>
 
             <div class="user-picker-grid">
-                ${sampleUsers.map((u, i) => `
+                ${users.map((u, i) => `
                     <div class="user-picker-card" data-user-id="${u.id}">
                         <div class="user-picker-avatar" style="background: ${avatarColors[i % avatarColors.length]}">
                             ${u.name.split(' ').map(n => n[0]).join('')}
@@ -763,16 +1021,15 @@ SELECT buyer_id FROM BUYER WHERE buyer_id = ?;</code></pre>
     // Email login handler
     document.getElementById('loginSubmit')?.addEventListener('click', () => {
         const email = document.getElementById('loginEmail').value.trim().toLowerCase();
-        const user = sampleUsers.find(u => u.email === email);
+        const user = users.find(u => u.email === email);
         if (user) {
             loginAs(user);
         } else if (email) {
-            // Partial match by name
-            const byName = sampleUsers.find(u => u.name.toLowerCase().includes(email.split('@')[0].replace('.', ' ')));
+            const byName = users.find(u => u.name.toLowerCase().includes(email.split('@')[0].replace('.', ' ')));
             if (byName) {
                 loginAs(byName);
             } else {
-                alert('User not found! Try picking a demo account below, or use an email like arjun.sharma1@campusswap.in');
+                alert('User not found! Try picking a demo account below, or use an email from the list.');
             }
         } else {
             alert('Please enter an email or pick a demo account below.');
@@ -783,86 +1040,116 @@ SELECT buyer_id FROM BUYER WHERE buyer_id = ?;</code></pre>
     document.querySelectorAll('.user-picker-card').forEach(card => {
         card.addEventListener('click', () => {
             const userId = parseInt(card.dataset.userId);
-            const user = sampleUsers.find(u => u.id === userId);
+            const user = users.find(u => u.id === userId);
             if (user) loginAs(user);
         });
     });
 }
 
-function loginAs(user) {
+async function loginAs(user) {
     currentUser = user;
     updateNavbar(user);
-    showProfile(user);
+    await showProfile(user);
 }
 
-function showProfile(user) {
+async function showProfile(user) {
     const body = document.getElementById('loginBody');
     const title = document.getElementById('loginModalTitle');
-    const idx = sampleUsers.indexOf(user);
-    const gradient = avatarColors[idx >= 0 ? idx % avatarColors.length : 0];
+    const idx = sampleUsers.findIndex(u => u.id === user.id);
+    const gradient = avatarColors[(idx >= 0 ? idx : user.id) % avatarColors.length];
 
     title.textContent = '👤 My Profile';
 
+    // If backend is connected, fetch live calculated data from MySQL
+    let liveUser = { ...user };
+    if (backendConnected) {
+        try {
+            const res = await fetch(`${API_BASE}/users/${user.id}`);
+            const data = await res.json();
+            if (data.user) {
+                const u = data.user;
+                liveUser = {
+                    id: u.user_id,
+                    name: u.name,
+                    email: u.email,
+                    phone: u.phone,
+                    hostel: u.hostel_block,
+                    room: u.room_no,
+                    isSeller: Boolean(u.is_seller),
+                    isBuyer: Boolean(u.is_buyer),
+                    upi: u.upi_id,
+                    totalSales: Number(u.total_sales || 0),
+                    avgRating: Number(u.avg_rating || 0),
+                    wallet: Number(u.wallet_balance || 0),
+                    listings: Number(u.listing_count || 0),
+                    orders: Number(u.order_count || 0)
+                };
+            }
+        } catch (err) {
+            console.warn('Could not fetch live profile:', err);
+        }
+    }
+
     const roles = [];
-    if (user.isSeller) roles.push('<span class="role-badge role-seller">🏷️ Seller</span>');
-    if (user.isBuyer) roles.push('<span class="role-badge role-buyer">🛒 Buyer</span>');
-    if (!user.isSeller && !user.isBuyer) roles.push('<span class="role-badge" style="background:rgba(225,112,85,0.15);color:#E17055">👀 Browser</span>');
+    if (liveUser.isSeller) roles.push('<span class="role-badge role-seller">🏷️ Seller</span>');
+    if (liveUser.isBuyer) roles.push('<span class="role-badge role-buyer">🛒 Buyer</span>');
+    if (!liveUser.isSeller && !liveUser.isBuyer) roles.push('<span class="role-badge" style="background:rgba(225,112,85,0.15);color:#E17055">👀 Browser</span>');
 
     body.innerHTML = `
         <div class="profile-container">
             <div class="profile-avatar-large" style="background: ${gradient}">
-                ${user.name.split(' ').map(n => n[0]).join('')}
+                ${liveUser.name.split(' ').map(n => n[0]).join('')}
             </div>
-            <div class="profile-name">${user.name}</div>
-            <div class="profile-email">${user.email}</div>
+            <div class="profile-name">${liveUser.name}</div>
+            <div class="profile-email">${liveUser.email}</div>
 
             <div class="profile-roles">${roles.join('')}</div>
 
             <div class="profile-details">
                 <div class="profile-detail-item">
                     <div class="profile-detail-label">Hostel</div>
-                    <div class="profile-detail-value">${user.hostel}</div>
+                    <div class="profile-detail-value">${liveUser.hostel}</div>
                 </div>
                 <div class="profile-detail-item">
                     <div class="profile-detail-label">Room</div>
-                    <div class="profile-detail-value">${user.room}</div>
+                    <div class="profile-detail-value">${liveUser.room}</div>
                 </div>
                 <div class="profile-detail-item">
                     <div class="profile-detail-label">Phone</div>
-                    <div class="profile-detail-value">${user.phone}</div>
+                    <div class="profile-detail-value">${liveUser.phone}</div>
                 </div>
                 <div class="profile-detail-item">
                     <div class="profile-detail-label">User ID</div>
-                    <div class="profile-detail-value">#${user.id}</div>
+                    <div class="profile-detail-value">#${liveUser.id}</div>
                 </div>
-                ${user.isSeller ? `
+                ${liveUser.isSeller ? `
                 <div class="profile-detail-item">
                     <div class="profile-detail-label">Total Sales</div>
-                    <div class="profile-detail-value" style="color:#00B894">₹${user.totalSales.toLocaleString('en-IN')}</div>
+                    <div class="profile-detail-value" style="color:#00B894">₹${liveUser.totalSales.toLocaleString('en-IN')}</div>
                 </div>
                 <div class="profile-detail-item">
                     <div class="profile-detail-label">Avg Rating</div>
-                    <div class="profile-detail-value" style="color:#FDCB6E">⭐ ${user.avgRating}</div>
+                    <div class="profile-detail-value" style="color:#FDCB6E">⭐ ${liveUser.avgRating}</div>
                 </div>
                 ` : ''}
-                ${user.isBuyer ? `
+                ${liveUser.isBuyer ? `
                 <div class="profile-detail-item">
                     <div class="profile-detail-label">Wallet</div>
-                    <div class="profile-detail-value" style="color:#A29BFE">₹${user.wallet.toLocaleString('en-IN')}</div>
+                    <div class="profile-detail-value" style="color:#A29BFE">₹${liveUser.wallet.toLocaleString('en-IN')}</div>
                 </div>
                 <div class="profile-detail-item">
                     <div class="profile-detail-label">Orders</div>
-                    <div class="profile-detail-value">${user.orders}</div>
+                    <div class="profile-detail-value">${liveUser.orders}</div>
                 </div>
                 ` : ''}
-                ${user.isSeller ? `
+                ${liveUser.isSeller ? `
                 <div class="profile-detail-item">
                     <div class="profile-detail-label">UPI ID</div>
-                    <div class="profile-detail-value">${user.upi}</div>
+                    <div class="profile-detail-value">${liveUser.upi || '—'}</div>
                 </div>
                 <div class="profile-detail-item">
                     <div class="profile-detail-label">Listings</div>
-                    <div class="profile-detail-value">${user.listings}</div>
+                    <div class="profile-detail-value">${liveUser.listings}</div>
                 </div>
                 ` : ''}
             </div>
@@ -888,7 +1175,7 @@ LEFT JOIN SELLER s ON u.user_id = s.seller_id
 LEFT JOIN BUYER b ON u.user_id = b.buyer_id
 LEFT JOIN LISTING l ON s.seller_id = l.seller_id
 LEFT JOIN ORDERS o ON b.buyer_id = o.buyer_id
-WHERE u.user_id = ${user.id}
+WHERE u.user_id = ${liveUser.id}
 GROUP BY u.user_id;
 
 -- This is the seller_dashboard_view in action!
@@ -913,8 +1200,8 @@ GROUP BY u.user_id;
 
 function updateNavbar(user) {
     const navActions = document.querySelector('.nav-actions');
-    const idx = sampleUsers.indexOf(user);
-    const gradient = avatarColors[idx >= 0 ? idx % avatarColors.length : 0];
+    const idx = sampleUsers.findIndex(u => u.id === user.id);
+    const gradient = avatarColors[(idx >= 0 ? idx : user.id) % avatarColors.length];
 
     navActions.innerHTML = `
         <button class="nav-user" id="navUserBtn">
@@ -951,10 +1238,12 @@ function resetNavbar() {
 }
 
 // ---- INIT ----
-document.addEventListener('DOMContentLoaded', () => {
-    renderListings();
-    renderRequests();
+document.addEventListener('DOMContentLoaded', async () => {
+    await checkBackend();
+    await renderListings();
+    await renderRequests();
     initModal();
     initSearch();
     initLogin();
+    initSell();
 });

@@ -224,6 +224,63 @@
         </div>
     </div>
 
+    <!-- ========== SELL MODAL ========== -->
+    <div class="modal-overlay" id="sellOverlay">
+        <div class="modal login-modal">
+            <div class="modal-header">
+                <h2>🏷️ Sell an Item</h2>
+                <button class="modal-close" id="sellClose">&times;</button>
+            </div>
+            <div class="modal-body" id="sellBody">
+                <form class="login-form" id="sellForm">
+                    <div>
+                        <label>Item Title *</label>
+                        <input type="text" id="sellTitle" placeholder="e.g. Database Systems by Navathe 7th Ed" required>
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                        <div>
+                            <label>Category *</label>
+                            <select id="sellCategory">
+                                <option value="1">Books (Engineering)</option>
+                                <option value="2">Books (Medical)</option>
+                                <option value="4">Electronics</option>
+                                <option value="6">Sports Gear</option>
+                                <option value="8">Stationery</option>
+                                <option value="9">Clothing</option>
+                                <option value="10">Furniture</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Condition *</label>
+                            <select id="sellCondition">
+                                <option value="LIKE_NEW">Like New</option>
+                                <option value="GOOD" selected>Good</option>
+                                <option value="FAIR">Fair</option>
+                                <option value="NEW">Brand New</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                        <div>
+                            <label>Price (₹) *</label>
+                            <input type="number" id="sellPrice" min="10" placeholder="350" required>
+                        </div>
+                        <div>
+                            <label>Quantity *</label>
+                            <input type="number" id="sellQty" min="1" value="1" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width:100%">Post Listing</button>
+                    <div class="concept-box" style="margin-top:8px;">
+                        <p style="margin-bottom:0; color:var(--text); font-size:0.82rem;">
+                            <strong>🔍 SQL Behind Listing:</strong> Executes <code>INSERT INTO LISTING (...)</code> with CHECK constraints (<code>price > 0</code>, <code>quantity >= 0</code>). If the user isn't in <code>SELLER</code> yet, specialization rule creates a <code>SELLER</code> row automatically.
+                        </p>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- ========== FOOTER ========== -->
     <footer class="footer">
         <div class="container">
