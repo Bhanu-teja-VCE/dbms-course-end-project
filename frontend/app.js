@@ -637,10 +637,324 @@ function initSearch() {
     });
 }
 
+// ============================================================================
+// LOGIN SYSTEM
+// Simulates database authentication for the demo. Shows:
+// 1. A user-picker (simulates SELECT * FROM USER)
+// 2. Profile view (simulates JOIN across USER, SELLER, BUYER)
+// 3. The actual SQL queries that would power this in a real app
+// ============================================================================
+
+// Sample users from the database (what seed.sql generates)
+const sampleUsers = [
+    { id: 1,  name: "Arjun Sharma",   email: "arjun.sharma1@campusswap.in",   phone: "+919876543210", hostel: "Block-A",        room: "204", isSeller: true,  isBuyer: true,  upi: "arjun@upi",   totalSales: 15420, avgRating: 4.5, wallet: 200,  listings: 8,  orders: 3 },
+    { id: 2,  name: "Priya Mehta",    email: "priya.mehta2@campusswap.in",     phone: "+919876543211", hostel: "Girls-Hostel-1", room: "312", isSeller: true,  isBuyer: true,  upi: "priya@upi",   totalSales: 12350, avgRating: 4.8, wallet: 500,  listings: 5,  orders: 7 },
+    { id: 3,  name: "Rohit Kumar",    email: "rohit.kumar3@campusswap.in",     phone: "+919876543212", hostel: "Block-C",        room: "108", isSeller: true,  isBuyer: false, upi: "rohit@upi",   totalSales: 9800,  avgRating: 4.2, wallet: 0,    listings: 12, orders: 0 },
+    { id: 4,  name: "Sneha Reddy",    email: "sneha.reddy4@campusswap.in",     phone: "+919876543213", hostel: "Girls-Hostel-2", room: "215", isSeller: true,  isBuyer: true,  upi: "sneha@upi",   totalSales: 8650,  avgRating: 3.9, wallet: 1200, listings: 6,  orders: 4 },
+    { id: 5,  name: "Vikram Desai",   email: "vikram.desai5@campusswap.in",    phone: "+919876543214", hostel: "Block-D",        room: "401", isSeller: true,  isBuyer: true,  upi: "vikram@upi",  totalSales: 7200,  avgRating: 4.7, wallet: 800,  listings: 3,  orders: 5 },
+    { id: 6,  name: "Ananya Patel",   email: "ananya.patel6@campusswap.in",    phone: "+919876543215", hostel: "Girls-Hostel-1", room: "119", isSeller: true,  isBuyer: false, upi: "ananya@upi",  totalSales: 3200,  avgRating: 4.3, wallet: 0,    listings: 4,  orders: 0 },
+    { id: 7,  name: "Karthik Verma",  email: "karthik.verma7@campusswap.in",   phone: "+919876543216", hostel: "Block-B",        room: "305", isSeller: false, isBuyer: true,  upi: null,          totalSales: 0,     avgRating: 0,   wallet: 350,  listings: 0,  orders: 6 },
+    { id: 8,  name: "Meera Thomas",   email: "meera.thomas8@campusswap.in",    phone: "+919876543217", hostel: "Block-E",        room: "210", isSeller: true,  isBuyer: true,  upi: "meera@upi",   totalSales: 5100,  avgRating: 4.6, wallet: 150,  listings: 7,  orders: 2 },
+    { id: 9,  name: "Rahul Gupta",    email: "rahul.gupta9@campusswap.in",     phone: "+919876543218", hostel: "Block-C",        room: "415", isSeller: false, isBuyer: true,  upi: null,          totalSales: 0,     avgRating: 0,   wallet: 900,  listings: 0,  orders: 8 },
+    { id: 10, name: "Divya Singh",    email: "divya.singh10@campusswap.in",    phone: "+919876543219", hostel: "Girls-Hostel-2", room: "102", isSeller: false, isBuyer: false, upi: null,          totalSales: 0,     avgRating: 0,   wallet: 0,    listings: 0,  orders: 0 },
+];
+
+// Avatar gradient colors for variety
+const avatarColors = [
+    'linear-gradient(135deg, #6C5CE7, #FD79A8)',
+    'linear-gradient(135deg, #00B894, #00CEC9)',
+    'linear-gradient(135deg, #E17055, #FDCB6E)',
+    'linear-gradient(135deg, #0984E3, #74B9FF)',
+    'linear-gradient(135deg, #A29BFE, #FD79A8)',
+    'linear-gradient(135deg, #00B894, #55EFC4)',
+    'linear-gradient(135deg, #E17055, #FAB1A0)',
+    'linear-gradient(135deg, #6C5CE7, #A29BFE)',
+    'linear-gradient(135deg, #0984E3, #00CEC9)',
+    'linear-gradient(135deg, #FD79A8, #E84393)',
+];
+
+let currentUser = null; // tracks who is "logged in"
+
+function initLogin() {
+    const loginBtn = document.getElementById('loginBtn');
+    const loginOverlay = document.getElementById('loginOverlay');
+    const loginClose = document.getElementById('loginClose');
+
+    function openLoginModal() {
+        loginOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        if (currentUser) {
+            showProfile(currentUser);
+        } else {
+            showLoginForm();
+        }
+    }
+
+    function closeLoginModal() {
+        loginOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    loginBtn?.addEventListener('click', openLoginModal);
+    loginClose?.addEventListener('click', closeLoginModal);
+    loginOverlay?.addEventListener('click', (e) => {
+        if (e.target === loginOverlay) closeLoginModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && loginOverlay.classList.contains('active')) {
+            closeLoginModal();
+        }
+    });
+}
+
+function showLoginForm() {
+    const body = document.getElementById('loginBody');
+    const title = document.getElementById('loginModalTitle');
+    title.textContent = '🔐 Student Login';
+
+    body.innerHTML = `
+        <div class="login-form">
+            <div>
+                <label>Email Address</label>
+                <input type="email" id="loginEmail" placeholder="your.name@campusswap.in" autocomplete="off">
+            </div>
+            <div>
+                <label>Password</label>
+                <input type="password" id="loginPassword" placeholder="Enter password" value="campus123">
+            </div>
+            <button class="btn btn-primary" id="loginSubmit" style="width:100%">Log In</button>
+
+            <div class="login-divider">or pick a demo account</div>
+
+            <div class="user-picker-grid">
+                ${sampleUsers.map((u, i) => `
+                    <div class="user-picker-card" data-user-id="${u.id}">
+                        <div class="user-picker-avatar" style="background: ${avatarColors[i % avatarColors.length]}">
+                            ${u.name.split(' ').map(n => n[0]).join('')}
+                        </div>
+                        <div class="user-picker-info">
+                            <div class="user-picker-name">${u.name}</div>
+                            <div class="user-picker-detail">${u.hostel} · Room ${u.room}</div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+
+            <div class="concept-box" style="margin-top: 8px;">
+                <p style="margin-bottom: 0; color: var(--text); font-size: 0.82rem;">
+                    <strong>🔍 SQL Behind Login:</strong> In a real app, clicking "Log In" runs:
+                </p>
+            </div>
+            <pre><code class="language-sql">-- Authentication query
+SELECT user_id, name, email, hostel_block, room_no
+FROM \`USER\`
+WHERE email = ? AND password_hash = SHA2(?, 256);
+
+-- Then check roles:
+SELECT seller_id FROM SELLER WHERE seller_id = ?;
+SELECT buyer_id FROM BUYER WHERE buyer_id = ?;</code></pre>
+        </div>
+    `;
+
+    // Highlight SQL
+    body.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+
+    // Email login handler
+    document.getElementById('loginSubmit')?.addEventListener('click', () => {
+        const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+        const user = sampleUsers.find(u => u.email === email);
+        if (user) {
+            loginAs(user);
+        } else if (email) {
+            // Partial match by name
+            const byName = sampleUsers.find(u => u.name.toLowerCase().includes(email.split('@')[0].replace('.', ' ')));
+            if (byName) {
+                loginAs(byName);
+            } else {
+                alert('User not found! Try picking a demo account below, or use an email like arjun.sharma1@campusswap.in');
+            }
+        } else {
+            alert('Please enter an email or pick a demo account below.');
+        }
+    });
+
+    // User picker click handler
+    document.querySelectorAll('.user-picker-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const userId = parseInt(card.dataset.userId);
+            const user = sampleUsers.find(u => u.id === userId);
+            if (user) loginAs(user);
+        });
+    });
+}
+
+function loginAs(user) {
+    currentUser = user;
+    updateNavbar(user);
+    showProfile(user);
+}
+
+function showProfile(user) {
+    const body = document.getElementById('loginBody');
+    const title = document.getElementById('loginModalTitle');
+    const idx = sampleUsers.indexOf(user);
+    const gradient = avatarColors[idx >= 0 ? idx % avatarColors.length : 0];
+
+    title.textContent = '👤 My Profile';
+
+    const roles = [];
+    if (user.isSeller) roles.push('<span class="role-badge role-seller">🏷️ Seller</span>');
+    if (user.isBuyer) roles.push('<span class="role-badge role-buyer">🛒 Buyer</span>');
+    if (!user.isSeller && !user.isBuyer) roles.push('<span class="role-badge" style="background:rgba(225,112,85,0.15);color:#E17055">👀 Browser</span>');
+
+    body.innerHTML = `
+        <div class="profile-container">
+            <div class="profile-avatar-large" style="background: ${gradient}">
+                ${user.name.split(' ').map(n => n[0]).join('')}
+            </div>
+            <div class="profile-name">${user.name}</div>
+            <div class="profile-email">${user.email}</div>
+
+            <div class="profile-roles">${roles.join('')}</div>
+
+            <div class="profile-details">
+                <div class="profile-detail-item">
+                    <div class="profile-detail-label">Hostel</div>
+                    <div class="profile-detail-value">${user.hostel}</div>
+                </div>
+                <div class="profile-detail-item">
+                    <div class="profile-detail-label">Room</div>
+                    <div class="profile-detail-value">${user.room}</div>
+                </div>
+                <div class="profile-detail-item">
+                    <div class="profile-detail-label">Phone</div>
+                    <div class="profile-detail-value">${user.phone}</div>
+                </div>
+                <div class="profile-detail-item">
+                    <div class="profile-detail-label">User ID</div>
+                    <div class="profile-detail-value">#${user.id}</div>
+                </div>
+                ${user.isSeller ? `
+                <div class="profile-detail-item">
+                    <div class="profile-detail-label">Total Sales</div>
+                    <div class="profile-detail-value" style="color:#00B894">₹${user.totalSales.toLocaleString('en-IN')}</div>
+                </div>
+                <div class="profile-detail-item">
+                    <div class="profile-detail-label">Avg Rating</div>
+                    <div class="profile-detail-value" style="color:#FDCB6E">⭐ ${user.avgRating}</div>
+                </div>
+                ` : ''}
+                ${user.isBuyer ? `
+                <div class="profile-detail-item">
+                    <div class="profile-detail-label">Wallet</div>
+                    <div class="profile-detail-value" style="color:#A29BFE">₹${user.wallet.toLocaleString('en-IN')}</div>
+                </div>
+                <div class="profile-detail-item">
+                    <div class="profile-detail-label">Orders</div>
+                    <div class="profile-detail-value">${user.orders}</div>
+                </div>
+                ` : ''}
+                ${user.isSeller ? `
+                <div class="profile-detail-item">
+                    <div class="profile-detail-label">UPI ID</div>
+                    <div class="profile-detail-value">${user.upi}</div>
+                </div>
+                <div class="profile-detail-item">
+                    <div class="profile-detail-label">Listings</div>
+                    <div class="profile-detail-value">${user.listings}</div>
+                </div>
+                ` : ''}
+            </div>
+
+            <div class="profile-actions">
+                <button class="btn btn-outline" id="switchUserBtn">Switch User</button>
+                <button class="btn btn-primary" id="logoutBtn" style="background: linear-gradient(135deg, #E17055, #D63031);">Log Out</button>
+            </div>
+
+            <div class="concept-box">
+                <p style="margin-bottom: 0; color: var(--text); font-size: 0.82rem;">
+                    <strong>🔍 SQL Behind This Profile:</strong>
+                </p>
+            </div>
+            <pre><code class="language-sql">-- Profile data comes from joining 3 tables:
+SELECT u.name, u.email, u.phone, u.hostel_block, u.room_no,
+       s.upi_id, s.total_sales, s.avg_rating,
+       b.wallet_balance,
+       COUNT(DISTINCT l.listing_id) AS listings,
+       COUNT(DISTINCT o.order_id) AS orders
+FROM \`USER\` u
+LEFT JOIN SELLER s ON u.user_id = s.seller_id
+LEFT JOIN BUYER b ON u.user_id = b.buyer_id
+LEFT JOIN LISTING l ON s.seller_id = l.seller_id
+LEFT JOIN ORDERS o ON b.buyer_id = o.buyer_id
+WHERE u.user_id = ${user.id}
+GROUP BY u.user_id;
+
+-- This is the seller_dashboard_view in action!
+-- LEFT JOINs because user might not be a seller or buyer</code></pre>
+        </div>
+    `;
+
+    // Highlight SQL
+    body.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+
+    // Button handlers
+    document.getElementById('switchUserBtn')?.addEventListener('click', () => {
+        showLoginForm();
+    });
+
+    document.getElementById('logoutBtn')?.addEventListener('click', () => {
+        currentUser = null;
+        resetNavbar();
+        showLoginForm();
+    });
+}
+
+function updateNavbar(user) {
+    const navActions = document.querySelector('.nav-actions');
+    const idx = sampleUsers.indexOf(user);
+    const gradient = avatarColors[idx >= 0 ? idx % avatarColors.length : 0];
+
+    navActions.innerHTML = `
+        <button class="nav-user" id="navUserBtn">
+            <div class="nav-user-avatar" style="background: ${gradient}">
+                ${user.name.split(' ').map(n => n[0]).join('')}
+            </div>
+            <span class="nav-user-name">${user.name.split(' ')[0]}</span>
+        </button>
+        <button class="btn btn-primary">Sell Now</button>
+    `;
+
+    // Click avatar → open profile
+    document.getElementById('navUserBtn')?.addEventListener('click', () => {
+        const loginOverlay = document.getElementById('loginOverlay');
+        loginOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        showProfile(user);
+    });
+}
+
+function resetNavbar() {
+    const navActions = document.querySelector('.nav-actions');
+    navActions.innerHTML = `
+        <button class="btn btn-outline" id="loginBtn">Log In</button>
+        <button class="btn btn-primary">Sell Now</button>
+    `;
+    // Re-attach login handler
+    document.getElementById('loginBtn')?.addEventListener('click', () => {
+        const loginOverlay = document.getElementById('loginOverlay');
+        loginOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        showLoginForm();
+    });
+}
+
 // ---- INIT ----
 document.addEventListener('DOMContentLoaded', () => {
     renderListings();
     renderRequests();
     initModal();
     initSearch();
+    initLogin();
 });
