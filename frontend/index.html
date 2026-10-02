@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusSwap — Student Marketplace</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- ========== NAVBAR ========== -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="#" class="logo">
+                <span class="logo-icon">⟲</span>
+                <span>Campus<strong>Swap</strong></span>
+            </a>
+            <div class="nav-links">
+                <a href="#listings" class="nav-link">Browse</a>
+                <a href="#categories" class="nav-link">Categories</a>
+                <a href="#requests" class="nav-link">Requests</a>
+                <a href="#" class="nav-link" id="howItWorksBtn">
+                    <span class="pulse-dot"></span>
+                    How It Works
+                </a>
+            </div>
+            <div class="nav-actions">
+                <button class="btn btn-outline" id="loginBtn">Log In</button>
+                <button class="btn btn-primary">Sell Now</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ========== HERO SECTION ========== -->
+    <section class="hero">
+        <div class="hero-bg-shapes">
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
+            <div class="shape shape-3"></div>
+        </div>
+        <div class="hero-content">
+            <span class="hero-badge">🎓 Built by Students, for Students</span>
+            <h1>Buy & Sell Campus<br><span class="gradient-text">Essentials</span></h1>
+            <p class="hero-subtitle">Textbooks, electronics, sports gear — everything your seniors left behind, now at prices your pocket loves.</p>
+            <div class="hero-search">
+                <input type="text" placeholder="Search for 'Data Structures', 'Calculator', 'Cricket Bat'..." id="searchInput">
+                <button class="btn btn-primary btn-search">Search</button>
+            </div>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-number">500+</span>
+                    <span class="stat-label">Listings</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">100+</span>
+                    <span class="stat-label">Students</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">15</span>
+                    <span class="stat-label">Categories</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">₹50-5K</span>
+                    <span class="stat-label">Price Range</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== CATEGORIES ========== -->
+    <section class="section" id="categories">
+        <div class="container">
+            <h2 class="section-title">Browse by Category</h2>
+            <p class="section-subtitle">Self-referencing category tree — sub-categories link back to the same table</p>
+            <div class="categories-grid">
+                <div class="category-card" data-category="books">
+                    <div class="category-icon">📚</div>
+                    <h3>Books</h3>
+                    <span class="category-count">200+ listings</span>
+                    <div class="sub-categories">
+                        <span class="sub-tag">Engineering</span>
+                        <span class="sub-tag">Medical</span>
+                        <span class="sub-tag">Fiction</span>
+                    </div>
+                </div>
+                <div class="category-card" data-category="electronics">
+                    <div class="category-icon">💻</div>
+                    <h3>Electronics</h3>
+                    <span class="category-count">80+ listings</span>
+                    <div class="sub-categories">
+                        <span class="sub-tag">Calculators</span>
+                        <span class="sub-tag">Earphones</span>
+                    </div>
+                </div>
+                <div class="category-card" data-category="sports">
+                    <div class="category-icon">🏏</div>
+                    <h3>Sports</h3>
+                    <span class="category-count">45+ listings</span>
+                    <div class="sub-categories">
+                        <span class="sub-tag">Cricket</span>
+                        <span class="sub-tag">Badminton</span>
+                    </div>
+                </div>
+                <div class="category-card" data-category="stationery">
+                    <div class="category-icon">✏️</div>
+                    <h3>Stationery</h3>
+                    <span class="category-count">60+ listings</span>
+                </div>
+                <div class="category-card" data-category="clothing">
+                    <div class="category-icon">👕</div>
+                    <h3>Clothing</h3>
+                    <span class="category-count">35+ listings</span>
+                </div>
+                <div class="category-card" data-category="furniture">
+                    <div class="category-icon">🪑</div>
+                    <h3>Furniture</h3>
+                    <span class="category-count">25+ listings</span>
+                </div>
+                <div class="category-card" data-category="accessories">
+                    <div class="category-icon">🎒</div>
+                    <h3>Accessories</h3>
+                    <span class="category-count">55+ listings</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== FEATURED LISTINGS ========== -->
+    <section class="section section-alt" id="listings">
+        <div class="container">
+            <h2 class="section-title">Featured Listings</h2>
+            <p class="section-subtitle">Fresh from the available_listings_view — a SQL VIEW that joins 3 tables in one query</p>
+            <div class="listings-grid" id="listingsGrid">
+                <!-- Generated by JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== REQUESTS ========== -->
+    <section class="section" id="requests">
+        <div class="container">
+            <h2 class="section-title">Wanted Requests</h2>
+            <p class="section-subtitle">Can't find what you need? Post a request!</p>
+            <div class="requests-list" id="requestsList">
+                <!-- Generated by JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== SELLER DASHBOARD PREVIEW ========== -->
+    <section class="section section-alt" id="dashboard">
+        <div class="container">
+            <h2 class="section-title">Seller Dashboard</h2>
+            <p class="section-subtitle">Powered by seller_dashboard_view — aggregates revenue, ratings, and listing counts</p>
+            <div class="dashboard-grid">
+                <div class="dashboard-card">
+                    <div class="dashboard-icon">📊</div>
+                    <div class="dashboard-info">
+                        <span class="dashboard-value">₹15,420</span>
+                        <span class="dashboard-label">Total Revenue</span>
+                    </div>
+                </div>
+                <div class="dashboard-card">
+                    <div class="dashboard-icon">⭐</div>
+                    <div class="dashboard-info">
+                        <span class="dashboard-value">4.3</span>
+                        <span class="dashboard-label">Avg Rating</span>
+                    </div>
+                </div>
+                <div class="dashboard-card">
+                    <div class="dashboard-icon">📦</div>
+                    <div class="dashboard-info">
+                        <span class="dashboard-value">12</span>
+                        <span class="dashboard-label">Active Listings</span>
+                    </div>
+                </div>
+                <div class="dashboard-card">
+                    <div class="dashboard-icon">✅</div>
+                    <div class="dashboard-info">
+                        <span class="dashboard-value">8</span>
+                        <span class="dashboard-label">Items Sold</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== HOW IT WORKS MODAL ========== -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>🔍 How It Works — The SQL Behind CampusSwap</h2>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            <div class="modal-tabs">
+                <button class="tab active" data-tab="schema">Schema</button>
+                <button class="tab" data-tab="queries">Queries</button>
+                <button class="tab" data-tab="normalization">Normalization</button>
+                <button class="tab" data-tab="procedures">Procedures</button>
+                <button class="tab" data-tab="transactions">Transactions</button>
+                <button class="tab" data-tab="indexes">Indexes</button>
+                <button class="tab" data-tab="er">ER Design</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Content injected by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== FOOTER ========== -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="logo-icon">⟲</span>
+                    <span>Campus<strong>Swap</strong></span>
+                    <p>A DBMS Course Project — Built with MySQL, Python (Faker), and ❤️</p>
+                </div>
+                <div class="footer-links">
+                    <h4>Project</h4>
+                    <a href="https://github.com" target="_blank">GitHub Repo</a>
+                    <a href="#" id="footerHowItWorks">How It Works</a>
+                    <a href="#">ER Diagram</a>
+                </div>
+                <div class="footer-links">
+                    <h4>Tech Stack</h4>
+                    <p>MySQL 8.0</p>
+                    <p>Python + Faker</p>
+                    <p>HTML/CSS/JS</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 CampusSwap — DBMS Course Project | B.Tech CSE</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
