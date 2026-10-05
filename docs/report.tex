@@ -1,0 +1,308 @@
+\documentclass[11pt,a4paper]{report}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{graphicx}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+% Section numbering depth
+\setcounter{secnumdepth}{3}
+\renewcommand{\thesection}{\arabic{section}}
+
+% Code formatting
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.96,0.96,0.98}
+
+\lstdefinestyle{sqlstyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegray},
+    keywordstyle=\color{blue}\bfseries,
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=sqlstyle}
+
+\begin{document}
+
+% ------------------ Cover Page ------------------
+
+\begin{titlepage}
+    \centering
+   
+    % Ensure 'College Logo RGB.jpg' is in your project folder or comment out if unavailable.
+    \IfFileExists{College Logo RGB.jpg}{
+        \includegraphics[width=4.5cm]{College Logo RGB.jpg}\\[0.8cm]
+    }{
+        \vspace*{1.5cm}
+        {\LARGE \textbf{VARDHAMAN COLLEGE OF ENGINEERING}}\\[0.5cm]
+        {\large (Autonomous, Affiliated to JNTUH, Accredited by NAAC with 'A++' Grade)}\\[1cm]
+    }
+
+    \textbf{\large A Course End Project Report on} \\[0.4cm]
+    {\LARGE \textbf{CampusSwap: Design and Implementation of an ACID-Compliant Relational Database Management System for Campus Marketplaces}}\\[1.2cm]
+    
+    {\Large \textbf{A9511 - Database Management Systems}}\\[1.2cm]
+    
+    \textbf{Submitted by}\\ [0.25cm]
+    Batch No. \textbf{[Batch No. Here]} 
+
+    \begin{center}
+        \begin{table}[h!]
+            \centering
+            \setstretch{1.2}
+            \begin{tabular}{l l}
+                \textbf{Bhanu Teja} & \textbf{Roll No - 1} \\ [2mm]
+                {Student Name 2} & {Roll No - 2} \\ [2mm]
+                {Student Name 3} & {Roll No - 3} \\ [2mm]
+            \end{tabular} 
+        \end{table}
+    \end{center}
+    
+    \vspace{0.4cm}
+    \textbf{Course Facilitator}\\ [0.1in]
+    \textbf{Dr. Reddy Saisindhutheja}\\
+    Associate Professor\\[1.8cm]
+
+    {\large\textbf{Department of Computer Science and Engineering}}\\[0.3cm]
+    {\large\textbf{Vardhaman College of Engineering, Hyderabad}}\\[0.3cm]
+    {\large \textbf{November 2026}}
+
+\end{titlepage}
+
+% ------------------ Contents ------------------
+
+\tableofcontents
+\newpage
+
+% ------------------ Section 1: Problem Definition ------------------
+
+\section{Problem Definition and Context}
+
+\subsection{Campus Marketplace Data Fragmentation and Commerce Challenges}
+Within higher education institutions, students systematically acquire, utilize, and dispose of significant volumes of physical academic resources, including reference textbooks, engineering calculators, lab kits, drawing instruments, and hostel gear. At the conclusion of each academic semester, senior students seek to liquidate these reusable assets, while incoming cohorts require affordable access to the exact same inventory. 
+
+Presently, this peer-to-peer exchange relies on unorganized, ad-hoc digital communication channels such as WhatsApp groups, Telegram channels, and physical notice boards. These channels suffer from acute operational and data engineering shortcomings:
+\begin{itemize}
+    \item \textbf{Absence of ACID Transaction Guarantees:} Concurrent buyer requests on solitary items trigger race conditions and double-allocation anomalies, leading to student disputes.
+    \item \textbf{Data Redundancy and Anomaly Vulnerability:} Unstructured item advertisements result in severe insertion, update, and deletion anomalies, with historical price records frequently lost.
+    \item \textbf{Lack of Structured Integrity and Constraints:} Missing domain validations allow invalid pricing, negative quantities, unverified seller reputations, and orphaned product categories.
+    \item \textbf{Suboptimal Retrieval and Search Bottlenecks:} Text-based matching without structured hierarchical indexing incurs high search latencies and excessive compute overheads.
+\end{itemize}
+
+\textbf{CampusSwap} addresses these engineering challenges by establishing a normalized, highly concurrent, and integrity-constrained Relational Database Management System (RDBMS) tailored to the localized campus environment.
+
+\subsection{Relevance to Sustainable Development Goals (SDGs)}
+The engineering architecture of CampusSwap directly aligns with multiple United Nations Sustainable Development Goals:
+\begin{itemize}
+    \item \textbf{SDG 12 (Responsible Consumption and Production):} Fosters an on-campus circular economy by maximizing the operational lifecycle of textbooks and equipment, directly curbing paper waste and electronic obsolescence.
+    \item \textbf{SDG 4 (Quality Education):} Democratizes access to high-cost academic resources for socio-economically diverse student demographics by reducing material acquisition costs by up to 70\%.
+    \item \textbf{SDG 9 (Industry, Innovation, and Infrastructure):} Deploys a robust, fault-tolerant transactional database architecture demonstrating scalable transactional patterns and ACID compliance.
+    \item \textbf{SDG 13 (Climate Action):} Reduces institutional carbon footprints associated with the repeated manufacturing, binding, packaging, and logistics of physical course textbooks.
+\end{itemize}
+
+% ------------------ Section 2: Problem Analysis ------------------
+
+\section{Problem Analysis and Solution Development}
+
+\subsection{Characterization of Complex Database Engineering Phenomena}
+Designing a localized campus marketplace demands solving several intricate data modeling and concurrency phenomena:
+\begin{enumerate}
+    \item \textbf{Overlapping Partial Specialization:} A student represented by the supertype entity \texttt{USER} can simultaneously act as a \texttt{SELLER} (liquidating items) and a \texttt{BUYER} (procuring items), while certain users may browse without engaging in transactions. Modeling this relationship without introducing sparse columns or null-heavy schemas requires rigorous relational subtyping.
+    \item \textbf{Self-Referential Category Hierarchies:} Academic merchandise spans recursive categorical structures (e.g., \textit{Books $\rightarrow$ Engineering $\rightarrow$ CSE $\rightarrow$ Core Textbooks}). The schema must maintain self-referencing foreign keys that gracefully handle sub-category cascades and reclassifications.
+    \item \textbf{Inventory Depletion Concurrency Anomalies:} When inventory reaches a unit quantity ($qty = 1$), concurrent checkout attempts by competing transactions create hazardous race conditions. Without row-level exclusive locks (\texttt{SELECT ... FOR UPDATE}), lost updates and negative stock anomalies compromise database consistency.
+    \item \textbf{Active Business Rule Enforcement:} Maintaining running seller reputation aggregates and price modification audit trails within application logic introduces race hazards; these must be delegated to the database engine via active event-driven triggers.
+\end{enumerate}
+
+\subsection{Engineering Knowledge Applied}
+The architecture integrates foundational principles across database theory, relational calculus, and systems programming:
+\begin{itemize}
+    \item \textbf{Relational Algebra and Calculus:} Formalized expression of queries using selection ($\sigma$), projection ($\pi$), equijoin ($\bowtie$), aggregate grouping ($\gamma$), rename ($\rho$), and set operators.
+    \item \textbf{Normalization Theory (1NF to BCNF):} Functional dependency analysis, attribute closure derivation, and lossless-join, dependency-preserving decomposition.
+    \item \textbf{Storage and Index Structures:} Implementation of balanced multi-way search trees (B+ Trees), composite indexing, and the leftmost-prefix evaluation rule.
+    \item \textbf{Transaction Management and Concurrency Control:} Strict Two-Phase Locking (2PL), ACID transaction boundaries, deadlocks characterization, and isolation guarantees.
+    \item \textbf{Active Database Mechanics:} Execution-phase event triggers (\texttt{BEFORE}/\texttt{AFTER UPDATE}, \texttt{AFTER INSERT}) and procedural cursor constructs.
+\end{itemize}
+
+\subsection{Mathematical and Theoretical Analysis}
+
+\subsubsection{Relational Algebra Formulations}
+To ensure rigorous algebraic tractability, core operations are mathematically formalized:
+
+\paragraph{1. Top 5 Revenue-Generating Sellers:}
+$$\rho_{(\text{seller\_name, total\_revenue}) \leftarrow (u.name, R)} \left( \pi_{u.name, \sum(oi.qty \cdot oi.price)} \left( \gamma_{s.seller\_id, u.name; \sum(oi.quantity \cdot oi.price\_at\_purchase) \rightarrow R} \left( USER \bowtie_{user\_id = seller\_id} SELLER \bowtie LISTING \bowtie ORDER\_ITEM \right) \right) \right)$$
+
+\paragraph{2. Listings Priced Below Respective Category Mean (Correlated Selection):}
+$$\sigma_{price < \overline{P}} \left( LISTING \bowtie_{category\_id} \left( \rho_{(category\_id, \overline{P}) \leftarrow (category\_id, AVG(price))} \left( \gamma_{category\_id; AVG(price) \rightarrow \overline{P}} (LISTING) \right) \right) \right)$$
+
+\paragraph{3. Buyers with Zero Order History (Set Difference):}
+$$\pi_{name, email}(USER) - \pi_{name, email}(USER \bowtie_{user\_id = buyer\_id} BUYER \bowtie_{buyer\_id = buyer\_id} ORDERS)$$
+
+\subsubsection{Functional Dependency and Attribute Closure Derivation}
+Consider the unnormalized flat relation $ORDER\_RAW$ containing attributes:
+$$\mathcal{U} = \{\text{order\_id, buyer\_email, buyer\_name, item\_name, item\_price, item\_qty, seller\_name, seller\_upi}\}$$
+
+Subject to the set of functional dependencies $\mathcal{F}$:
+\begin{align*}
+    FD_1: &\quad order\_id \rightarrow \{buyer\_email, buyer\_name\} \\
+    FD_2: &\quad buyer\_email \rightarrow \{buyer\_name\} \\
+    FD_3: &\quad \{order\_id, item\_name\} \rightarrow \{item\_price, item\_qty, seller\_name, seller\_upi\} \\
+    FD_4: &\quad seller\_name \rightarrow \{seller\_upi\}
+\end{align*}
+
+To identify candidate keys, we determine the attribute closure of $\alpha = \{order\_id, item\_name\}^+$ under $\mathcal{F}$:
+\begin{align*}
+    \alpha^{(0)} &= \{order\_id, item\_name\} \\
+    \alpha^{(1)} &= \{order\_id, item\_name, buyer\_email, buyer\_name\} \quad (\text{via } FD_1) \\
+    \alpha^{(2)} &= \{order\_id, item\_name, buyer\_email, buyer\_name, item\_price, item\_qty, seller\_name, seller\_upi\} \quad (\text{via } FD_3)
+\end{align*}
+Since $\alpha^{(2)} = \mathcal{U}$, $\{order\_id, item\_name\}$ is a valid superkey. Minimal dependency analysis confirms it is the minimal candidate key.
+
+\paragraph{Normalization Decomposition Steps:}
+\begin{itemize}
+    \item \textbf{1NF to 2NF Decomposition:} In $\mathcal{U}$, $FD_1$ reveals a partial dependency: non-prime attribute $buyer\_email$ depends on $order\_id \subset \{order\_id, item\_name\}$. Decomposed into:
+    \begin{align*}
+        R_1(order\_id, buyer\_email, buyer\_name), \quad R_2(order\_id, item\_name, item\_price, item\_qty, seller\_name, seller\_upi)
+    \end{align*}
+    \item \textbf{2NF to 3NF Decomposition:} In $R_1$, $order\_id \rightarrow buyer\_email$ and $buyer\_email \rightarrow buyer\_name$ constitutes a transitive dependency. Decomposed into:
+    \begin{align*}
+        ORDERS(order\_id, buyer\_email), \quad BUYER(buyer\_email, buyer\_name)
+    \end{align*}
+    \item \textbf{3NF to BCNF Decomposition:} In $R_2$, $FD_4: seller\_name \rightarrow seller\_upi$ holds where $seller\_name$ is not a superkey. Decomposed into:
+    \begin{align*}
+        SELLER(seller\_name, seller\_upi), \quad ORDER\_ITEM(order\_id, item\_name, item\_price, item\_qty, seller\_name)
+    \end{align*}
+\end{itemize}
+The resulting schema eliminates all update, insertion, and deletion anomalies while preserving lossless-join properties.
+
+\subsubsection{B+ Tree Indexing Computational Complexity}
+For a relation with $N$ rows indexed by a B+ Tree of node order $M$, the tree height $h$ and search cost are modeled as:
+$$h \le \left\lceil \log_{\lceil M/2 \rceil} \left(\frac{N+1}{2}\right) \right\rceil + 1$$
+While a sequential full-table scan requires $\mathcal{O}(N)$ page reads, B+ tree traversal bounds disk input/output operations to $\mathcal{O}(\log_{M/2} N)$. In a dataset exceeding 5,000 records, index seeks reduce page lookups from over 5,000 block reads to at most 3 block accesses.
+
+\subsection{Proposed Solution Strategy and Implementation}
+The CampusSwap relational architecture decomposes the domain into 12 normalized entities integrated with transactional triggers, stored procedures, and composite indexes.
+
+\begin{table}[h!]
+    \centering
+    \caption{Architectural Strategies and DBMS Implementation Details}
+    \vspace{2mm}
+    \setstretch{1.2}
+    \begin{tabular}{|l|p{10.5cm}|}
+        \hline
+        \textbf{Strategy} & \textbf{Implementation Details in CampusSwap} \\ \hline
+        Subtype Specialization & USER partitioned into SELLER and BUYER using overlapping, partial foreign key hierarchies. LISTING specialized into BOOK\_DETAILS for ISBN and author semantics. \\ \hline
+        Hierarchical Categories & Self-referencing FK (\texttt{parent\_category\_id} $\rightarrow$ \texttt{category\_id}) supporting tree depth with \texttt{ON DELETE SET NULL}. \\ \hline
+        Integrity Constraints & Declarative \texttt{CHECK (price > 0)}, \texttt{CHECK (quantity >= 0)}, \texttt{CHECK (rating BETWEEN 1 AND 5)}, and strict \texttt{ENUM} status restrictions. \\ \hline
+        ACID Order Procedure & Stored procedure \texttt{place\_order()} wrapped in an explicit transaction with row-level locking (\texttt{FOR UPDATE}) and automated rollback handlers. \\ \hline
+        Event-Driven Triggers & \texttt{trg\_listing\_sold\_out} automatically updates status to SOLD; \texttt{trg\_update\_seller\_rating} aggregates ratings; \texttt{trg\_price\_audit} captures historical mutations. \\ \hline
+        Batch Lifecycle Cursor & Cursor procedure \texttt{mark\_expired\_listings()} scanning listings older than 60 days to enforce time-bound lifecycle transitions. \\ \hline
+        Indexing Architecture & B+ Tree single-column index on \texttt{LISTING(title)} and composite index on \texttt{LISTING(category\_id, status)} satisfying the leftmost-prefix rule. \\ \hline
+    \end{tabular}
+\end{table}
+
+% ------------------ Section 3: Program Outcome Mapping ------------------
+
+\section{Application of Program Outcomes and Sustainability Goals}
+As per NBA SAR requirements for solving complex engineering problems incorporating sustainability, Table \ref{tab:po_mapping} outlines the alignment of CampusSwap with Program Outcomes (POs) and UN Sustainable Development Goals (SDGs).
+
+\begin{table}[h!]
+    \centering
+    \renewcommand{\arraystretch}{1.3}
+    \setlength{\tabcolsep}{7pt}
+    \caption{Mapping of POs and Targeted Sustainability Goals}
+    \label{tab:po_mapping}
+    \begin{tabular}{|c|p{8.5cm}|c|}
+        \hline
+        \textbf{PO No.} & \textbf{Relevance to Complex Engineering Problem Solving} & \textbf{Targeted SDG} \\
+        \hline
+        \textbf{PO1} & \textbf{Engineering Knowledge:} Applies relational algebra, attribute closure mathematics, and B+ tree search complexity to database modeling. & SDG 9 \\
+        \hline
+        \textbf{PO2} & \textbf{Problem Analysis:} Evaluates anomalies in unnormalized relations, computes functional dependency closures, and structures BCNF decompositions. & SDG 9 \\
+        \hline
+        \textbf{PO3} & \textbf{Design/Development of Solutions:} Designs an ACID-compliant schema with subtype constraints, automated audit triggers, and race-free procedures. & SDG 12 \\
+        \hline
+        \textbf{PO4} & \textbf{Investigations of Complex Problems:} Investigates concurrent race conditions via two-session simulations and benchmarks EXPLAIN execution plans on 5000+ records. & SDG 9 \\
+        \hline
+        \textbf{PO5} & \textbf{Modern Tool Usage:} Utilizes MySQL 8.0 InnoDB engine, Python Faker synthetic data orchestration, Flask REST API framework, and Git version control. & SDG 9 \\
+        \hline
+        \textbf{PO7} & \textbf{Environment and Sustainability:} Advances campus circular economies and textbook recycling, directly minimizing institutional paper waste. & SDG 12, 13 \\
+        \hline
+        \textbf{PO11} & \textbf{Project Management and Finance:} Implements full-lifecycle engineering from conceptual E-R design to transactional financial ledgers and audits. & SDG 8, 9 \\
+        \hline
+        \textbf{PO12} & \textbf{Life-Long Learning:} Demonstrates mastery over evolving database standards (SQL:2016, JSON integration, ACID microservices integration). & SDG 4 \\
+        \hline
+    \end{tabular}
+\end{table}
+
+% ------------------ Section 4: Sustainability ------------------
+
+\section{Sustainability Integration}
+
+\subsection{Resource Utilization and Circular Economy}
+CampusSwap fundamentally addresses the resource-intensive dynamics of academic material production. Millions of textbooks, engineering manuals, and specialized calculators are printed each academic year with an average active study utility of merely four to five months. By providing a low-latency, trust-verified campus marketplace:
+\begin{itemize}
+    \item \textbf{Textbook Reusability:} Extends the operational life of physical volumes across 4--6 student generations, preventing redundant paper pulp manufacturing.
+    \item \textbf{E-Waste Mitigation:} Facilitates the resale and repair of functional scientific electronics (calculators, headphones, development boards) that would otherwise enter municipal landfills.
+    \item \textbf{Equitable Education Access (SDG 4):} Dampens the financial barrier of higher education course materials, empowering economically vulnerable students with identical learning assets.
+\end{itemize}
+
+\subsection{Computational and Server Energy Efficiency}
+Database queries executed without proper indexing incur massive CPU and storage input/output (I/O) burdens. In large-scale academic cloud clusters, unoptimized full-table scans burn continuous electrical energy. 
+
+By structuring balanced B+ Tree indexes (\texttt{idx\_listing\_cat\_status} and \texttt{idx\_listing\_title}), the query execution planner avoids linear page scans ($N > 5000$), reducing CPU instruction cycles and cache churn by orders of magnitude. The corresponding reduction in compute resource consumption translates directly to lower server electrical dissipation and minimized data-center carbon footprints, supporting \textbf{SDG 13}.
+
+% ------------------ Section 5: Conclusion ------------------
+
+\section{Conclusion and Future Directions}
+
+\subsection{Solution Summary}
+The CampusSwap database system demonstrates a production-grade, pedagogically defensible relational architecture for academic commerce. Through an 8-stage engineering lifecycle, the project successfully established:
+\begin{enumerate}
+    \item An expressive Entity-Relationship model incorporating overlapping partial specialization and self-referential hierarchies.
+    \item A fully constrained, anomaly-free relational schema strictly normalized to Boyce-Codd Normal Form (BCNF).
+    \item Transactional stored procedures with strict Two-Phase Locking preventing double-allocation race conditions under peak concurrency.
+    \item Active database triggers ensuring autonomous integrity enforcement and immutable price audit logging.
+    \item A decoupled full-stack architecture coupling a Python Flask REST backend to an interactive visual query demonstration frontend.
+\end{enumerate}
+
+\subsection{Future Scope}
+Future research and systems engineering enhancements will focus on:
+\begin{itemize}
+    \item \textbf{Distributed Database Sharding:} Horizontally partitioning listings across multi-campus collegiate clusters using consistent hashing algorithms.
+    \item \textbf{In-Memory Inverted Caching:} Deploying Redis cache clusters for sub-millisecond retrieval of hot, frequently visited marketplace categories.
+    \item \textbf{AI-Driven Academic Syllabus Matching:} Integrating vector embeddings to autonomously match student enrolled course syllabi with listed textbook editions.
+\end{itemize}
+
+% ------------------ Section 6: References ------------------
+
+\begin{thebibliography}{99}
+    \bibitem{korth} A. Silberschatz, H. F. Korth, and S. Sudarshan, \textit{Database System Concepts}, 7th Edition, McGraw-Hill Education, 2019.
+    \bibitem{navathe} R. Elmasri and S. B. Navathe, \textit{Fundamentals of Database Systems}, 7th Edition, Pearson Education, 2016.
+    \bibitem{ramakrishnan} R. Ramakrishnan and J. Gehrke, \textit{Database Management Systems}, 3rd Edition, McGraw-Hill, 2003.
+    \bibitem{codd} E. F. Codd, "A Relational Model of Data for Large Shared Data Banks," \textit{Communications of the ACM}, Vol. 13, No. 6, pp. 377--387, 1970.
+    \bibitem{mysql_manual} Oracle Corporation, \textit{MySQL 8.0 Reference Manual: InnoDB Storage Engine and Transaction Model}, Oracle Docs, 2024.
+    \bibitem{bernstein} P. A. Bernstein and E. Newcomer, \textit{Principles of Transaction Processing}, 2nd Edition, Morgan Kaufmann, 2009.
+\end{thebibliography}
+
+\end{document}
