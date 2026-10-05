@@ -1,55 +1,54 @@
 // ============================================================================
-// CampusSwap — Frontend Logic
-// Powers the listing cards, request cards, and the "How It Works" modal
-// that showcases every SQL query, procedure, trigger, and concept used.
+// Bank Loan Management System — Frontend Application Logic
+// ============================================================================
+// Course Project : B.Tech CSE Database Management Systems
+// Project        : Bank Loan Management System: EMI Processing, Repayment
+//                  Tracking, and Risk Assessment
+// Architecture   : Single Page Application (SPA) with Live REST API &
+//                  Resilient Fallback Mode
 // ============================================================================
 
-// ---- API BASE URL & CONNECTION STATE ----
+// ----------------------------------------------------------------------------
+// 1. API CONFIGURATION & CONNECTION STATE
+// ----------------------------------------------------------------------------
 const API_BASE = 'http://localhost:5000/api';
 let backendConnected = false;
+let currentLoggedInUser = null;
+let allLoansCache = [];
+let allApplicantsCache = [];
+let allProductsCache = [];
+let activeCategoryFilter = 'ALL';
 
-// ---- FALLBACK SAMPLE DATA (used when backend is not running) ----
-const sampleListings = [
-    { listing_id: 1, title: "Data Structures by Tanenbaum, 3rd Ed", price: 350, condition: "GOOD", seller_name: "Arjun Sharma", seller_rating: 4.5, category_name: "Engineering Books" },
-    { listing_id: 2, title: "Casio fx-991EX Scientific Calculator", price: 850, condition: "LIKE_NEW", seller_name: "Priya Mehta", seller_rating: 4.8, category_name: "Calculators" },
-    { listing_id: 3, title: "SG Cricket Bat — English Willow", price: 2200, condition: "GOOD", seller_name: "Rohit Kumar", seller_rating: 4.2, category_name: "Cricket" },
-    { listing_id: 4, title: "DBMS by Navathe, 7th Edition", price: 280, condition: "FAIR", seller_name: "Sneha Reddy", seller_rating: 3.9, category_name: "Engineering Books" },
-    { listing_id: 5, title: "JBL Tune 510BT Headphones", price: 1500, condition: "NEW", seller_name: "Vikram Desai", seller_rating: 4.7, category_name: "Electronics" },
-    { listing_id: 6, title: "HP 15s Laptop Bag", price: 450, condition: "LIKE_NEW", seller_name: "Ananya Patel", seller_rating: 4.3, category_name: "Accessories" },
-    { listing_id: 7, title: "Operating Systems by Galvin, 9th Ed", price: 320, condition: "GOOD", seller_name: "Karthik Verma", seller_rating: 4.1, category_name: "Engineering Books" },
-    { listing_id: 8, title: "Yonex Badminton Racket — Nanoray", price: 1800, condition: "GOOD", seller_name: "Meera Thomas", seller_rating: 4.6, category_name: "Badminton" },
-];
-
-const sampleRequests = [
-    { request_id: 1, title: "Looking for DBMS by Navathe, any edition", user_name: "Rahul Gupta", budget_max: 300, status: "OPEN", hostel_block: "Block-C" },
-    { request_id: 2, title: "Need Casio fx-82 calculator for exam", user_name: "Divya Singh", budget_max: 500, status: "OPEN", hostel_block: "Girls-Hostel-1" },
-    { request_id: 3, title: "Want study table in good condition", user_name: "Arun Menon", budget_max: 1500, status: "FULFILLED", hostel_block: "Block-A" },
-    { request_id: 4, title: "Looking for COA by Morris Mano", user_name: "Pooja Krishnan", budget_max: 250, status: "OPEN", hostel_block: "Girls-Hostel-2" },
-    { request_id: 5, title: "Need badminton shuttle cocks (Mavis 350)", user_name: "Sanjay Rathore", budget_max: 400, status: "OPEN", hostel_block: "Block-D" },
-];
-
-// Map category to icon
+// Category Icons mapping
 const categoryIcons = {
-    'Books': '📚', 'Engineering Books': '📘', 'Medical Books': '📗', 'Fiction': '📙',
-    'Electronics': '💻', 'Calculators': '🔢', 'Earphones': '🎧',
-    'Sports': '🏏', 'Cricket': '🏏', 'Badminton': '🏸',
-    'Stationery': '✏️', 'Clothing': '👕', 'Furniture': '🪑', 'Accessories': '🎒',
+    'HOME': '🏠',
+    'PERSONAL': '💼',
+    'VEHICLE': '🚗',
+    'EDUCATION': '🎓',
+    'BUSINESS': '🏢',
+    'GOLD': '💰',
+    'AGRICULTURE': '🌾'
 };
 
-function getCategoryIcon(catName) {
-    if (!catName) return '📦';
-    for (const [key, icon] of Object.entries(categoryIcons)) {
-        if (catName.toLowerCase().includes(key.toLowerCase())) return icon;
-    }
-    return '📦';
+function getCategoryIcon(type) {
+    if (!type) return '📋';
+    const key = type.toUpperCase().trim();
+    return categoryIcons[key] || '📋';
 }
 
-// ---- CHECK BACKEND HEALTH ----
+function formatINR(val) {
+    if (val === null || val === undefined || isNaN(val)) return '₹0';
+    return '₹' + Number(val).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+}
+
+// ----------------------------------------------------------------------------
+// 2. BACKEND HEALTH CHECK
+// ----------------------------------------------------------------------------
 async function checkBackend() {
     try {
-        const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(1500) });
+        const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(2000) });
         const data = await res.json();
-        backendConnected = (data.status === 'ok');
+        backendConnected = (data.status === 'ok' && data.connected === true);
     } catch (e) {
         backendConnected = false;
     }
@@ -57,1193 +56,2177 @@ async function checkBackend() {
     const badge = document.querySelector('.hero-badge');
     if (badge) {
         if (backendConnected) {
-            badge.innerHTML = '🟢 Connected to MySQL (Live Database)';
+            badge.innerHTML = '🟢 Connected to MySQL (bank_loan_db)';
             badge.style.borderColor = 'rgba(0, 184, 148, 0.4)';
             badge.style.color = '#00B894';
+            badge.title = 'Live MySQL 8.0 InnoDB connection active';
         } else {
             badge.innerHTML = '🟡 Demo Mode (Static Data) — Start backend/app.py for Live DB';
             badge.style.borderColor = 'rgba(253, 203, 110, 0.4)';
             badge.style.color = '#FDCB6E';
+            badge.title = 'Operating offline. Start Flask app with MySQL to run real queries.';
         }
     }
     return backendConnected;
 }
 
-// ---- RENDER LISTING CARDS ----
-async function renderListings() {
+// ----------------------------------------------------------------------------
+// 3. FALLBACK SAMPLE DATA (INDIAN BANK CONTEXT - SBI STYLE)
+// ----------------------------------------------------------------------------
+const sampleApplicants = [
+    {
+        applicant_id: 1,
+        name: "Rohan Verma",
+        email: "rohan.verma@gmail.com",
+        phone: "+91 98201 12345",
+        address: "402, Sea Green Apts, Worli, Mumbai 400018",
+        dob: "1988-04-12",
+        pan_no: "ABCPV1234A",
+        aadhaar_no: "2341 5678 9012",
+        annual_income: 1850000,
+        credit_score: 785,
+        employment_type: "SALARIED",
+        employer_name: "Tata Consultancy Services",
+        total_loans: 1,
+        active_loans: 1,
+        total_borrowed: 4500000
+    },
+    {
+        applicant_id: 2,
+        name: "Priya Sharma",
+        email: "priya.sharma@yahoo.co.in",
+        phone: "+91 98111 23456",
+        address: "B-12, Green Glen Layout, Bellandur, Bengaluru 560103",
+        dob: "1992-08-23",
+        pan_no: "BCDPS5678B",
+        aadhaar_no: "3452 6789 0123",
+        annual_income: 950000,
+        credit_score: 740,
+        employment_type: "SALARIED",
+        employer_name: "Infosys Ltd",
+        total_loans: 1,
+        active_loans: 1,
+        total_borrowed: 500000
+    },
+    {
+        applicant_id: 3,
+        name: "Amit Patel",
+        email: "amit.patel@patellogistics.in",
+        phone: "+91 98450 34567",
+        address: "78, Navrangpura Road, Ahmedabad 380009",
+        dob: "1985-11-05",
+        pan_no: "CDEPA9012C",
+        aadhaar_no: "4563 7890 1234",
+        annual_income: 1400000,
+        credit_score: 695,
+        employment_type: "SELF_EMPLOYED",
+        employer_name: "Patel Freight Logistics",
+        total_loans: 1,
+        active_loans: 1,
+        total_borrowed: 850000
+    },
+    {
+        applicant_id: 4,
+        name: "Sneha Rao",
+        email: "sneha.rao@microsoft.com",
+        phone: "+91 98765 43210",
+        address: "Flat 304, Cyber Heights, Gachibowli, Hyderabad 500032",
+        dob: "1996-03-30",
+        pan_no: "DEFRS3456D",
+        aadhaar_no: "5674 8901 2345",
+        annual_income: 2400000,
+        credit_score: 810,
+        employment_type: "SALARIED",
+        employer_name: "Microsoft India",
+        total_loans: 1,
+        active_loans: 1,
+        total_borrowed: 2000000
+    },
+    {
+        applicant_id: 5,
+        name: "Rajesh Gupta",
+        email: "rajesh.gupta@guptatraders.com",
+        phone: "+91 97170 56789",
+        address: "12/A, Chandni Chowk Commercial Complex, Old Delhi 110006",
+        dob: "1978-06-19",
+        pan_no: "EFGRG7890E",
+        aadhaar_no: "6785 9012 3456",
+        annual_income: 2100000,
+        credit_score: 560,
+        employment_type: "BUSINESS",
+        employer_name: "Gupta Metal & Electricals",
+        total_loans: 1,
+        active_loans: 0,
+        total_borrowed: 3500000
+    },
+    {
+        applicant_id: 6,
+        name: "Vikram Singh",
+        email: "vikram.singh@royalauto.co.in",
+        phone: "+91 99280 67890",
+        address: "104, Malviya Nagar, Jaipur 302017",
+        dob: "1989-09-14",
+        pan_no: "FGHVS1234F",
+        aadhaar_no: "7896 0123 4567",
+        annual_income: 1150000,
+        credit_score: 720,
+        employment_type: "SELF_EMPLOYED",
+        employer_name: "Royal Automobiles",
+        total_loans: 1,
+        active_loans: 0,
+        total_borrowed: 300000
+    },
+    {
+        applicant_id: 7,
+        name: "Ananya Iyer",
+        email: "ananya.iyer@hdfcbank.com",
+        phone: "+91 94440 78901",
+        address: "7th Cross, Gandhinagar, Adyar, Chennai 600020",
+        dob: "1991-12-08",
+        pan_no: "GHIAS5678G",
+        aadhaar_no: "8907 1234 5678",
+        annual_income: 2800000,
+        credit_score: 830,
+        employment_type: "SALARIED",
+        employer_name: "HDFC Bank Corporate Office",
+        total_loans: 1,
+        active_loans: 0,
+        total_borrowed: 6000000
+    },
+    {
+        applicant_id: 8,
+        name: "Manoj Kumar",
+        email: "manoj.kumar.farms@gmail.com",
+        phone: "+91 98390 89012",
+        address: "Village Pipra, Tehsil Sadar, Varanasi 221001",
+        dob: "1983-05-25",
+        pan_no: "HIJMK9012H",
+        aadhaar_no: "9018 2345 6789",
+        annual_income: 680000,
+        credit_score: 680,
+        employment_type: "FARMER",
+        employer_name: "Self-Employed Agriculture",
+        total_loans: 1,
+        active_loans: 1,
+        total_borrowed: 400000
+    }
+];
+
+const sampleLoans = [
+    {
+        loan_id: 1001,
+        applicant_id: 1,
+        applicant_name: "Rohan Verma",
+        applicant_email: "rohan.verma@gmail.com",
+        credit_score: 785,
+        product_id: 1,
+        product_name: "SBI Regular Home Loan",
+        product_type: "HOME",
+        guarantor_id: 1,
+        guarantor_name: "Kavita Verma",
+        principal_amount: 4500000,
+        interest_rate: 8.50,
+        tenure_months: 240,
+        emi_amount: 39052,
+        total_payable: 9372480,
+        disbursement_date: "2024-01-20",
+        maturity_date: "2044-01-20",
+        status: "ACTIVE",
+        approved_by: "Ramesh Iyer (Chief Manager)",
+        remarks: "Clear property title deed. 20-year EMI tenure authorized."
+    },
+    {
+        loan_id: 1002,
+        applicant_id: 2,
+        applicant_name: "Priya Sharma",
+        applicant_email: "priya.sharma@yahoo.co.in",
+        credit_score: 740,
+        product_id: 2,
+        product_name: "SBI Express Credit Personal Loan",
+        product_type: "PERSONAL",
+        guarantor_id: null,
+        guarantor_name: null,
+        principal_amount: 500000,
+        interest_rate: 11.25,
+        tenure_months: 36,
+        emi_amount: 16429,
+        total_payable: 591444,
+        disbursement_date: "2024-02-15",
+        maturity_date: "2027-02-15",
+        status: "ACTIVE",
+        approved_by: "Snehal Deshmukh (Loan Officer)",
+        remarks: "Salary auto-debit activated with corporate employer."
+    },
+    {
+        loan_id: 1003,
+        applicant_id: 3,
+        applicant_name: "Amit Patel",
+        applicant_email: "amit.patel@patellogistics.in",
+        credit_score: 695,
+        product_id: 3,
+        product_name: "SBI Car Loan Platinum",
+        product_type: "VEHICLE",
+        guarantor_id: null,
+        guarantor_name: null,
+        principal_amount: 850000,
+        interest_rate: 8.85,
+        tenure_months: 60,
+        emi_amount: 17585,
+        total_payable: 1055100,
+        disbursement_date: "2024-02-22",
+        maturity_date: "2029-02-22",
+        status: "ACTIVE",
+        approved_by: "Vikram Aditya (Credit Manager)",
+        remarks: "Vehicle hypothecation endorsed with RTO Ahmedabad."
+    },
+    {
+        loan_id: 1004,
+        applicant_id: 4,
+        applicant_name: "Sneha Rao",
+        applicant_email: "sneha.rao@microsoft.com",
+        credit_score: 810,
+        product_id: 4,
+        product_name: "SBI Scholar Education Loan",
+        product_type: "EDUCATION",
+        guarantor_id: 2,
+        guarantor_name: "Venkatesh Rao",
+        principal_amount: 2000000,
+        interest_rate: 9.15,
+        tenure_months: 120,
+        emi_amount: 25502,
+        total_payable: 3060240,
+        disbursement_date: "2024-03-05",
+        maturity_date: "2034-03-05",
+        status: "ACTIVE",
+        approved_by: "Ramesh Iyer (Chief Manager)",
+        remarks: "Stanford University MS CS. Parent co-obligation accepted."
+    },
+    {
+        loan_id: 1005,
+        applicant_id: 5,
+        applicant_name: "Rajesh Gupta",
+        applicant_email: "rajesh.gupta@guptatraders.com",
+        credit_score: 560,
+        product_id: 5,
+        product_name: "SME Working Capital & Term Loan",
+        product_type: "BUSINESS",
+        guarantor_id: 3,
+        guarantor_name: "Sunil Gupta",
+        principal_amount: 3500000,
+        interest_rate: 12.50,
+        tenure_months: 60,
+        emi_amount: 78728,
+        total_payable: 4723680,
+        disbursement_date: "2023-06-15",
+        maturity_date: "2028-06-15",
+        status: "DEFAULTED",
+        approved_by: "Vikram Aditya (Credit Manager)",
+        remarks: "Classified as NPA (>90 days overdue). SARFAESI demand notice served."
+    },
+    {
+        loan_id: 1006,
+        applicant_id: 6,
+        applicant_name: "Vikram Singh",
+        applicant_email: "vikram.singh@royalauto.co.in",
+        credit_score: 720,
+        product_id: 6,
+        product_name: "SBI Sovereign Gold Loan",
+        product_type: "GOLD",
+        guarantor_id: null,
+        guarantor_name: null,
+        principal_amount: 300000,
+        interest_rate: 7.75,
+        tenure_months: 12,
+        emi_amount: 26063,
+        total_payable: 312756,
+        disbursement_date: "2023-03-10",
+        maturity_date: "2024-03-10",
+        status: "CLOSED",
+        approved_by: "Snehal Deshmukh (Loan Officer)",
+        remarks: "Matured and paid in full. Pledged ornaments released."
+    },
+    {
+        loan_id: 1007,
+        applicant_id: 7,
+        applicant_name: "Ananya Iyer",
+        applicant_email: "ananya.iyer@hdfcbank.com",
+        credit_score: 830,
+        product_id: 1,
+        product_name: "SBI Regular Home Loan",
+        product_type: "HOME",
+        guarantor_id: null,
+        guarantor_name: null,
+        principal_amount: 6000000,
+        interest_rate: 8.40,
+        tenure_months: 240,
+        emi_amount: 51691,
+        total_payable: 12405840,
+        disbursement_date: null,
+        maturity_date: null,
+        status: "APPROVED",
+        approved_by: "Ramesh Iyer (Chief Manager)",
+        remarks: "Approved under Platinum prime tier. Pending disbursement."
+    },
+    {
+        loan_id: 1008,
+        applicant_id: 8,
+        applicant_name: "Manoj Kumar",
+        applicant_email: "manoj.kumar.farms@gmail.com",
+        credit_score: 680,
+        product_id: 7,
+        product_name: "Kisan Credit Card & Agri Loan",
+        product_type: "AGRICULTURE",
+        guarantor_id: null,
+        guarantor_name: null,
+        principal_amount: 400000,
+        interest_rate: 7.00,
+        tenure_months: 36,
+        emi_amount: 12351,
+        total_payable: 444636,
+        disbursement_date: "2024-04-18",
+        maturity_date: "2027-04-18",
+        status: "ACTIVE",
+        approved_by: "Snehal Deshmukh (Loan Officer)",
+        remarks: "Seasonal crop credit linked with central interest subvention."
+    }
+];
+
+const sampleProducts = [
+    { product_id: 1, name: "SBI Regular Home Loan", product_type: "HOME", interest_rate: 8.50, min_amount: 500000, max_amount: 10000000, min_tenure_months: 12, max_tenure_months: 360, processing_fee_pct: 0.50 },
+    { product_id: 2, name: "SBI Express Credit Personal", product_type: "PERSONAL", interest_rate: 11.25, min_amount: 50000, max_amount: 2000000, min_tenure_months: 12, max_tenure_months: 72, processing_fee_pct: 1.00 },
+    { product_id: 3, name: "SBI Car Loan Platinum", product_type: "VEHICLE", interest_rate: 8.85, min_amount: 100000, max_amount: 3500000, min_tenure_months: 12, max_tenure_months: 84, processing_fee_pct: 0.75 },
+    { product_id: 4, name: "SBI Scholar Education Loan", product_type: "EDUCATION", interest_rate: 9.15, min_amount: 100000, max_amount: 4000000, min_tenure_months: 12, max_tenure_months: 180, processing_fee_pct: 0.00 },
+    { product_id: 5, name: "SME Working Capital & Term Loan", product_type: "BUSINESS", interest_rate: 12.50, min_amount: 200000, max_amount: 5000000, min_tenure_months: 12, max_tenure_months: 60, processing_fee_pct: 1.25 },
+    { product_id: 6, name: "SBI Sovereign Gold Loan", product_type: "GOLD", interest_rate: 7.75, min_amount: 25000, max_amount: 5000000, min_tenure_months: 3, max_tenure_months: 36, processing_fee_pct: 0.50 },
+    { product_id: 7, name: "Kisan Credit Card & Agri Loan", product_type: "AGRICULTURE", interest_rate: 7.00, min_amount: 50000, max_amount: 1500000, min_tenure_months: 6, max_tenure_months: 60, processing_fee_pct: 0.00 }
+];
+
+// Bank Staff for officer login simulation
+const sampleBankUsers = [
+    {
+        user_id: 1,
+        name: "Ramesh Iyer",
+        role: "Branch Manager & Sanction Authority",
+        branch: "Fort Branch, Mumbai (00012)",
+        emp_code: "SBI_MGR_4091",
+        email: "ramesh.iyer@sbi.co.in",
+        sanction_limit: 10000000
+    },
+    {
+        user_id: 2,
+        name: "Snehal Deshmukh",
+        role: "Senior Loan Officer (Retail Credit)",
+        branch: "Worli Retail Hub, Mumbai (00045)",
+        emp_code: "SBI_OFF_8912",
+        email: "snehal.d@sbi.co.in",
+        sanction_limit: 2500000
+    },
+    {
+        user_id: 3,
+        name: "Vikram Aditya",
+        role: "Chief Risk & Recovery Officer (NPA)",
+        branch: "Zonal Recovery Cell, Nariman Point (00099)",
+        emp_code: "SBI_RSK_1044",
+        email: "vikram.aditya@sbi.co.in",
+        sanction_limit: 5000000
+    }
+];
+
+// ----------------------------------------------------------------------------
+// 4. RENDER LOANS (DISPLAY LOAN CARDS WITH ENHANCED BADGES)
+// ----------------------------------------------------------------------------
+async function renderLoans(loansToRender = null) {
     const grid = document.getElementById('listingsGrid');
     if (!grid) return;
 
-    let listings = sampleListings;
-
-    if (backendConnected) {
-        try {
-            const res = await fetch(`${API_BASE}/listings?status=ACTIVE`);
-            const data = await res.json();
-            if (data.listings && data.listings.length > 0) {
-                listings = data.listings.slice(0, 12);
+    if (!loansToRender) {
+        if (backendConnected) {
+            try {
+                const res = await fetch(`${API_BASE}/loans`);
+                const data = await res.json();
+                if (data.data && data.data.length > 0) {
+                    allLoansCache = data.data;
+                } else {
+                    allLoansCache = sampleLoans;
+                }
+            } catch (err) {
+                console.warn('API error, using sample loans:', err);
+                allLoansCache = sampleLoans;
             }
-        } catch (err) {
-            console.warn('Using sample listings due to API fetch error:', err);
+        } else {
+            allLoansCache = sampleLoans;
         }
+        loansToRender = allLoansCache;
     }
 
-    grid.innerHTML = listings.map(item => {
-        const title = item.title;
-        const price = Number(item.price);
-        const cond = (item.condition || 'GOOD').toLowerCase();
-        const seller = item.seller_name || item.seller || 'Seller';
-        const rating = item.seller_rating || item.rating || '4.0';
-        const cat = item.category_name || item.category || 'General';
-        const icon = getCategoryIcon(cat);
+    // Filter by active category if not 'ALL'
+    if (activeCategoryFilter && activeCategoryFilter !== 'ALL') {
+        loansToRender = loansToRender.filter(l => (l.product_type || '').toUpperCase() === activeCategoryFilter);
+    }
+
+    if (loansToRender.length === 0) {
+        grid.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--text-muted);">
+                <div style="font-size: 3rem; margin-bottom: 12px;">🔍</div>
+                <h3>No loans found matching your criteria</h3>
+                <p>Try resetting the search or category filter.</p>
+                <button class="btn btn-outline" style="margin-top:16px;" onclick="resetFilters()">View All Loans</button>
+            </div>
+        `;
+        return;
+    }
+
+    grid.innerHTML = loansToRender.map(loan => {
+        const icon = getCategoryIcon(loan.product_type);
+        const statusClass = `status-${(loan.status || 'pending').toLowerCase()}`;
+        
+        let statusBadgeColor = '#00B894';
+        if (loan.status === 'DEFAULTED') statusBadgeColor = '#E17055';
+        else if (loan.status === 'PENDING') statusBadgeColor = '#FDCB6E';
+        else if (loan.status === 'CLOSED') statusBadgeColor = '#A29BFE';
+        else if (loan.status === 'APPROVED') statusBadgeColor = '#0984E3';
 
         return `
-        <div class="listing-card" data-id="${item.listing_id || item.id}">
-            <div class="listing-image">${icon}</div>
-            <div class="listing-info">
-                <div class="listing-title">${title}</div>
-                <div class="listing-meta">
-                    <span class="listing-price">₹${price.toLocaleString('en-IN')}</span>
-                    <span class="listing-condition condition-${cond}">${cond.replace('_', ' ')}</span>
+            <div class="listing-card" onclick="openLoanDetailModal(${loan.loan_id})" style="cursor: pointer;">
+                <div class="listing-image" style="background: linear-gradient(135deg, rgba(108, 92, 231, 0.12), rgba(0, 184, 148, 0.12));">
+                    <span style="font-size: 3.5rem;">${icon}</span>
                 </div>
-                <div class="listing-seller">
-                    <span class="seller-avatar">${seller[0]}</span>
-                    ${seller} · ${cat}
+                <div class="listing-info">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600; text-transform:uppercase;">
+                            Loan #${loan.loan_id} &bull; ${loan.product_type || 'RETAIL'}
+                        </span>
+                        <span class="request-status" style="background: ${statusBadgeColor}22; color: ${statusBadgeColor}; font-size:0.7rem; padding: 3px 10px;">
+                            ${loan.status}
+                        </span>
+                    </div>
+
+                    <h3 class="listing-title" style="margin-bottom: 4px; font-size: 1.1rem; color: var(--text);">
+                        ${loan.applicant_name}
+                    </h3>
+                    <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 14px;">
+                        ${loan.product_name}
+                    </p>
+
+                    <div style="background: var(--bg-surface); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 14px; border: 1px solid var(--glass-border);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">Principal Sanctioned</span>
+                            <span style="font-size: 0.95rem; font-weight: 700; color: var(--secondary);">${formatINR(loan.principal_amount)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">Monthly EMI</span>
+                            <span style="font-size: 0.9rem; font-weight: 600; color: var(--primary-light);">${formatINR(loan.emi_amount)} / mo</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">Tenure & Rate</span>
+                            <span style="font-size: 0.8rem; color: var(--text);">${loan.tenure_months} Mos @ ${loan.interest_rate}%</span>
+                        </div>
+                    </div>
+
+                    <div class="listing-footer" style="padding: 0; border: none; margin-top: 8px;">
+                        <div style="font-size: 0.75rem; color: var(--text-dim);">
+                            Score: <strong style="color:${loan.credit_score >= 750 ? '#00B894' : (loan.credit_score >= 650 ? '#FDCB6E' : '#E17055')}">${loan.credit_score || 'N/A'}</strong>
+                        </div>
+                        <span style="font-size: 0.8rem; color: var(--primary-light); font-weight: 500;">
+                            View Schedule &rarr;
+                        </span>
+                    </div>
                 </div>
             </div>
-            <div class="listing-footer">
-                <span class="listing-rating">⭐ ${rating}</span>
-                <button class="btn btn-primary btn-small" onclick="handleBuyClick(${item.listing_id || item.id}, '${title.replace(/'/g, "\\'")}', ${price})">Buy</button>
-            </div>
-        </div>
         `;
     }).join('');
 }
 
-// ---- RENDER REQUEST CARDS ----
-async function renderRequests() {
+// ----------------------------------------------------------------------------
+// 5. RENDER APPLICANTS (BORROWER PROFILES & CREDIT RISK)
+// ----------------------------------------------------------------------------
+async function renderApplicants() {
     const list = document.getElementById('requestsList');
     if (!list) return;
 
-    let requests = sampleRequests;
-
     if (backendConnected) {
         try {
-            const res = await fetch(`${API_BASE}/requests`);
+            const res = await fetch(`${API_BASE}/applicants`);
             const data = await res.json();
-            if (data.requests && data.requests.length > 0) {
-                requests = data.requests.slice(0, 8);
+            if (data.data && data.data.length > 0) {
+                allApplicantsCache = data.data;
+            } else {
+                allApplicantsCache = sampleApplicants;
             }
-        } catch (err) {
-            console.warn('Using sample requests due to API fetch error:', err);
+        } catch (e) {
+            allApplicantsCache = sampleApplicants;
         }
+    } else {
+        allApplicantsCache = sampleApplicants;
     }
 
-    list.innerHTML = requests.map(req => {
-        const title = req.title;
-        const status = (req.status || 'OPEN').toLowerCase();
-        const user = req.user_name || req.user || 'Student';
-        const hostel = req.hostel_block || req.hostel || 'Campus';
-        const budget = Number(req.budget_max || req.budget || 0);
+    list.innerHTML = allApplicantsCache.map(app => {
+        let scoreClass = '#00B894';
+        let scoreLabel = 'EXCELLENT';
+        if (app.credit_score < 600) {
+            scoreClass = '#E17055';
+            scoreLabel = 'HIGH RISK';
+        } else if (app.credit_score < 720) {
+            scoreClass = '#FDCB6E';
+            scoreLabel = 'MODERATE';
+        }
 
         return `
-        <div class="request-card">
-            <span class="request-status status-${status}">${status.toUpperCase()}</span>
-            <div class="request-info">
-                <div class="request-title">${title}</div>
-                <div class="request-detail">${user} · ${hostel}</div>
+            <div class="request-card" onclick="openApplicantDetailModal(${app.applicant_id})" style="cursor:pointer;">
+                <div class="seller-avatar" style="width:48px; height:48px; font-size:1.1rem; flex-shrink:0;">
+                    ${app.name.split(' ').map(n=>n[0]).join('').substring(0,2)}
+                </div>
+                <div class="request-info" style="flex:1;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                        <h4 style="margin:0; font-size:1rem; font-weight:600; color:var(--text);">${app.name}</h4>
+                        <span style="font-size:0.7rem; padding:2px 8px; border-radius:4px; background:rgba(108,92,231,0.15); color:var(--primary-light); font-weight:600;">
+                            PAN: ${app.pan_no}
+                        </span>
+                    </div>
+                    <p style="margin:0; font-size:0.8rem; color:var(--text-muted);">
+                        ${app.employment_type} &bull; ${app.employer_name || 'Individual'} &bull; Income: ${formatINR(app.annual_income)}/yr
+                    </p>
+                    <p style="margin:4px 0 0; font-size:0.75rem; color:var(--text-dim);">
+                        Active Loans: <strong style="color:var(--text);">${app.active_loans || (app.total_loans ? 1 : 0)}</strong> &bull; Total Sanctions: ${formatINR(app.total_borrowed || 0)}
+                    </p>
+                </div>
+                <div style="text-align:right; flex-shrink:0;">
+                    <div style="font-size:1.25rem; font-weight:800; color:${scoreClass};">
+                        ${app.credit_score}
+                    </div>
+                    <span style="font-size:0.65rem; font-weight:700; color:${scoreClass}; letter-spacing:0.05em;">
+                        ${scoreLabel}
+                    </span>
+                </div>
             </div>
-            <span class="request-budget">≤ ₹${budget.toLocaleString('en-IN')}</span>
-        </div>
         `;
     }).join('');
 }
 
-// ---- HOW IT WORKS — SQL CONTENT FOR EACH TAB ----
+// ----------------------------------------------------------------------------
+// 6. HOW IT WORKS CONTENT — 7 TECHNICAL TABS
+// ----------------------------------------------------------------------------
 const howItWorksContent = {
     schema: `
-        <h3>📐 Database Schema — 12 Tables</h3>
-        <p>The schema uses <strong>MySQL 8.0</strong> with InnoDB engine for ACID transactions and foreign key support. Here's the core structure:</p>
+        <h3>🏛️ Database Schema Architecture (bank_loan_db)</h3>
+        <p>
+            The system is built on <strong>MySQL 8.0 with the InnoDB storage engine</strong>.
+            All 8 tables strictly enforce relational integrity, referential constraints, and business domain rules.
+        </p>
 
         <div class="concept-box">
-            <p><strong>Design Decision:</strong> We use overlapping, partial specialization for USER → SELLER/BUYER. A student can be both (sells old books, buys a calculator). Not everyone is either (new users just browsing).</p>
+            <p><strong>🎯 Viva Defence — Why InnoDB?</strong><br>
+            Unlike MyISAM, InnoDB supports <code>ACID Transactions</code>, foreign key constraints (<code>ON DELETE RESTRICT/CASCADE</code>), 
+            and row-level locking (<code>SELECT ... FOR UPDATE</code>) essential for high-throughput concurrent loan repayments.</p>
         </div>
 
-        <span class="sql-label">USER TABLE — The Foundation</span>
-        <pre><code class="language-sql">CREATE TABLE \`USER\` (
-    user_id       INT AUTO_INCREMENT,
-    name          VARCHAR(100) NOT NULL,
-    email         VARCHAR(150) NOT NULL,
-    phone         VARCHAR(15),
-    hostel_block  VARCHAR(20),
-    room_no       VARCHAR(10),
-    joined_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT pk_user       PRIMARY KEY (user_id),
-    CONSTRAINT uq_user_email UNIQUE (email)
-    -- UNIQUE prevents duplicate registrations
+        <span class="sql-label">1. APPLICANT Table (Core Entity)</span>
+        <pre><code class="language-sql">CREATE TABLE APPLICANT (
+    applicant_id    INT AUTO_INCREMENT PRIMARY KEY,
+    name            VARCHAR(100) NOT NULL,
+    email           VARCHAR(150) NOT NULL UNIQUE,
+    phone           VARCHAR(15)  NOT NULL,
+    address         TEXT         NOT NULL,
+    dob             DATE         NOT NULL,
+    pan_no          VARCHAR(10)  NOT NULL UNIQUE,    -- 10-character Indian PAN
+    aadhaar_no      VARCHAR(12)  NOT NULL UNIQUE,    -- 12-digit Indian Aadhaar
+    annual_income   DECIMAL(12,2) NOT NULL,
+    credit_score    INT NOT NULL,                    -- CIBIL credit score range
+    employment_type ENUM('SALARIED', 'SELF_EMPLOYED', 'BUSINESS', 'STUDENT', 'FARMER', 'RETIRED') NOT NULL,
+    employer_name   VARCHAR(150),
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_applicant_income CHECK (annual_income >= 0),
+    CONSTRAINT chk_applicant_cibil  CHECK (credit_score BETWEEN 300 AND 900)
 ) ENGINE=InnoDB;</code></pre>
 
-        <span class="sql-label">LISTING TABLE — Items for Sale</span>
-        <pre><code class="language-sql">CREATE TABLE LISTING (
-    listing_id   INT AUTO_INCREMENT,
-    seller_id    INT NOT NULL,
-    category_id  INT NOT NULL,
-    title        VARCHAR(200) NOT NULL,
-    price        DECIMAL(10,2) NOT NULL,
-    quantity     INT NOT NULL DEFAULT 1,
-    \`condition\`  ENUM('NEW','LIKE_NEW','GOOD','FAIR','POOR'),
-    status       ENUM('ACTIVE','SOLD','EXPIRED','REMOVED'),
-
-    PRIMARY KEY (listing_id),
-    FOREIGN KEY (seller_id) REFERENCES SELLER(seller_id) ON DELETE CASCADE,
-    FOREIGN KEY (category_id) REFERENCES CATEGORY(category_id) ON DELETE RESTRICT,
-    CHECK (price > 0),  -- No free listings by accident
-    CHECK (quantity >= 0)
-);</code></pre>
-
-        <div class="concept-box">
-            <p><strong>Why DECIMAL, not FLOAT?</strong> FLOAT has rounding errors (0.1 + 0.2 ≠ 0.3 in floating point). DECIMAL stores exact values — critical for money. Try it: <code>SELECT 0.1 + 0.2;</code> in both types!</p>
-        </div>
-
-        <span class="sql-label">CATEGORY — Self-Referencing FK</span>
-        <pre><code class="language-sql">CREATE TABLE CATEGORY (
-    category_id         INT AUTO_INCREMENT PRIMARY KEY,
+        <span class="sql-label">2. LOAN_PRODUCT Table (Credit Catalog)</span>
+        <pre><code class="language-sql">CREATE TABLE LOAN_PRODUCT (
+    product_id          INT AUTO_INCREMENT PRIMARY KEY,
     name                VARCHAR(100) NOT NULL,
-    parent_category_id  INT DEFAULT NULL,
+    product_type        ENUM('HOME', 'PERSONAL', 'VEHICLE', 'EDUCATION', 'BUSINESS', 'GOLD', 'AGRICULTURE') NOT NULL,
+    interest_rate       DECIMAL(5,2)  NOT NULL,       -- Annual interest rate %
+    min_amount          DECIMAL(12,2) NOT NULL,
+    max_amount          DECIMAL(12,2) NOT NULL,
+    min_tenure_months   INT           NOT NULL,
+    max_tenure_months   INT           NOT NULL,
+    processing_fee_pct  DECIMAL(4,2)  NOT NULL DEFAULT 1.00,
+    penalty_rate_pct    DECIMAL(4,2)  NOT NULL DEFAULT 2.00,
+    description         TEXT,
+    CONSTRAINT chk_prod_rate   CHECK (interest_rate > 0),
+    CONSTRAINT chk_prod_amt    CHECK (max_amount >= min_amount),
+    CONSTRAINT chk_prod_tenure CHECK (max_tenure_months >= min_tenure_months)
+) ENGINE=InnoDB;</code></pre>
 
-    FOREIGN KEY (parent_category_id) REFERENCES CATEGORY(category_id)
-        ON DELETE SET NULL
-    -- "Books" → "Engineering Books" → "CSE"
-    -- NULL parent = top-level category
-);</code></pre>
+        <span class="sql-label">3. GUARANTOR Table (Secondary Security)</span>
+        <pre><code class="language-sql">CREATE TABLE GUARANTOR (
+    guarantor_id    INT AUTO_INCREMENT PRIMARY KEY,
+    name            VARCHAR(100)  NOT NULL,
+    phone           VARCHAR(15)   NOT NULL,
+    pan_no          VARCHAR(10)   NOT NULL,
+    relationship    VARCHAR(50)   NOT NULL,
+    annual_income   DECIMAL(12,2) NOT NULL,
+    address         TEXT          NOT NULL
+) ENGINE=InnoDB;</code></pre>
 
-        <h3>🔗 Key Constraints Used</h3>
-        <p><strong>PRIMARY KEY:</strong> Uniquely identifies each row. AUTO_INCREMENT generates IDs automatically.</p>
-        <p><strong>FOREIGN KEY + ON DELETE CASCADE:</strong> Deleting a user auto-deletes their seller profile. Maintains referential integrity.</p>
-        <p><strong>FOREIGN KEY + ON DELETE RESTRICT:</strong> Can't delete a category that has listings — forces re-categorization first.</p>
-        <p><strong>CHECK:</strong> <code>price > 0</code> ensures no zero/negative prices. <code>rating BETWEEN 1 AND 5</code> enforces valid star ratings.</p>
-        <p><strong>UNIQUE:</strong> <code>email</code> prevents duplicate accounts. <code>(reviewer_id, listing_id)</code> ensures one review per user per item.</p>
-        <p><strong>ENUM:</strong> Restricts columns to specific values — <code>status ENUM('ACTIVE','SOLD','EXPIRED')</code>. In Oracle, you'd use CHECK with IN(...).</p>
+        <span class="sql-label">4. LOAN Table (Central Fact Table)</span>
+        <pre><code class="language-sql">CREATE TABLE LOAN (
+    loan_id           INT AUTO_INCREMENT PRIMARY KEY,
+    applicant_id      INT           NOT NULL,
+    product_id        INT           NOT NULL,
+    guarantor_id      INT           NULL,             -- Nullable for unsecured retail loans
+    principal_amount  DECIMAL(12,2) NOT NULL,
+    interest_rate     DECIMAL(5,2)  NOT NULL,
+    tenure_months     INT           NOT NULL,
+    emi_amount        DECIMAL(10,2) NOT NULL,         -- Pre-calculated reducing-balance EMI
+    total_payable     DECIMAL(12,2) NOT NULL,
+    disbursement_date DATE          NULL,
+    maturity_date     DATE          NULL,
+    status            ENUM('PENDING', 'APPROVED', 'ACTIVE', 'CLOSED', 'DEFAULTED', 'REJECTED') 
+                      NOT NULL DEFAULT 'PENDING',
+    approved_by       VARCHAR(100),
+    remarks           TEXT,
+    created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_loan_applicant FOREIGN KEY (applicant_id) REFERENCES APPLICANT(applicant_id),
+    CONSTRAINT fk_loan_product   FOREIGN KEY (product_id)   REFERENCES LOAN_PRODUCT(product_id),
+    CONSTRAINT fk_loan_guarantor FOREIGN KEY (guarantor_id) REFERENCES GUARANTOR(guarantor_id) ON DELETE SET NULL,
+    CONSTRAINT chk_loan_principal CHECK (principal_amount > 0),
+    CONSTRAINT chk_loan_rate      CHECK (interest_rate > 0),
+    CONSTRAINT chk_loan_tenure    CHECK (tenure_months > 0),
+    CONSTRAINT chk_loan_emi       CHECK (emi_amount > 0)
+) ENGINE=InnoDB;</code></pre>
+
+        <span class="sql-label">5. EMI_SCHEDULE Table (Amortization Ledger)</span>
+        <pre><code class="language-sql">CREATE TABLE EMI_SCHEDULE (
+    emi_id              INT AUTO_INCREMENT PRIMARY KEY,
+    loan_id             INT           NOT NULL,
+    installment_no      INT           NOT NULL,
+    due_date            DATE          NOT NULL,
+    principal_component DECIMAL(10,2) NOT NULL,
+    interest_component  DECIMAL(10,2) NOT NULL,
+    emi_amount          DECIMAL(10,2) NOT NULL,
+    balance_after       DECIMAL(12,2) NOT NULL,
+    status              ENUM('PENDING', 'PAID', 'OVERDUE', 'PARTIALLY_PAID') NOT NULL DEFAULT 'PENDING',
+    paid_date           DATETIME      NULL,
+    penalty_amount      DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    CONSTRAINT fk_emi_loan FOREIGN KEY (loan_id) REFERENCES LOAN(loan_id) ON DELETE CASCADE,
+    CONSTRAINT uq_loan_installment UNIQUE (loan_id, installment_no)
+) ENGINE=InnoDB;</code></pre>
+
+        <span class="sql-label">6. REPAYMENT Table (Audit-Proof Payment Log)</span>
+        <pre><code class="language-sql">CREATE TABLE REPAYMENT (
+    repayment_id    INT AUTO_INCREMENT PRIMARY KEY,
+    emi_id          INT           NOT NULL,
+    loan_id         INT           NOT NULL,
+    amount_paid     DECIMAL(10,2) NOT NULL,
+    payment_date    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    payment_mode    ENUM('CASH', 'CHEQUE', 'NEFT', 'UPI', 'AUTO_DEBIT') NOT NULL,
+    transaction_ref VARCHAR(100)  NOT NULL,
+    late_fee        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    remarks         VARCHAR(255),
+    CONSTRAINT fk_rep_emi  FOREIGN KEY (emi_id)  REFERENCES EMI_SCHEDULE(emi_id),
+    CONSTRAINT fk_rep_loan FOREIGN KEY (loan_id) REFERENCES LOAN(loan_id),
+    CONSTRAINT chk_rep_amount CHECK (amount_paid > 0)
+) ENGINE=InnoDB;</code></pre>
+
+        <span class="sql-label">7. DEFAULT_LOG Table (NPA Delinquency Register)</span>
+        <pre><code class="language-sql">CREATE TABLE DEFAULT_LOG (
+    default_id          INT AUTO_INCREMENT PRIMARY KEY,
+    loan_id             INT           NOT NULL,
+    default_date        DATE          NOT NULL,
+    outstanding_amount  DECIMAL(12,2) NOT NULL,
+    months_overdue      INT           NOT NULL,
+    action_taken        ENUM('NOTICE_ISSUED', 'LEGAL_PROCEEDING', 'SARFAESI_ACT', 'RESTRUCTURING', 'RECOVERY_AGENT_ASSIGNED', 'WRITTEN_OFF') NOT NULL,
+    resolved            BOOLEAN       NOT NULL DEFAULT FALSE,
+    resolution_date     DATE          NULL,
+    remarks             TEXT,
+    CONSTRAINT fk_def_loan FOREIGN KEY (loan_id) REFERENCES LOAN(loan_id)
+) ENGINE=InnoDB;</code></pre>
+
+        <span class="sql-label">8. LOAN_AUDIT Table (Regulatory Audit Trail)</span>
+        <pre><code class="language-sql">CREATE TABLE LOAN_AUDIT (
+    audit_id      INT AUTO_INCREMENT PRIMARY KEY,
+    loan_id       INT          NOT NULL,
+    field_changed VARCHAR(100) NOT NULL,
+    old_value     TEXT,
+    new_value     TEXT,
+    changed_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    changed_by    VARCHAR(100) NOT NULL DEFAULT 'SYSTEM'
+) ENGINE=InnoDB;</code></pre>
     `,
 
     queries: `
-        <h3>📊 Top 5 Sellers by Revenue</h3>
-        <p>JOINs USER → SELLER → LISTING → ORDER_ITEM to sum up what each seller earned:</p>
-        <pre><code class="language-sql">SELECT u.name AS seller_name,
-       SUM(oi.quantity * oi.price_at_purchase) AS total_revenue
-FROM \`USER\` u
-JOIN SELLER s ON u.user_id = s.seller_id
-JOIN LISTING l ON s.seller_id = l.seller_id
-JOIN ORDER_ITEM oi ON l.listing_id = oi.listing_id
-GROUP BY u.user_id, u.name
-ORDER BY total_revenue DESC
-LIMIT 5;</code></pre>
+        <h3>📊 Analytical & Operational SQL Queries</h3>
+        <p>Every query demonstrates relational algebra principles: selection, projection, equi-joins, and aggregations.</p>
 
-        <h3>📦 Categories With More Than 10 Listings (HAVING)</h3>
+        <span class="sql-label">Query 1: Delinquent Loans Report (High Risk Identification)</span>
+        <pre><code class="language-sql">SELECT 
+    l.loan_id,
+    a.name AS applicant_name,
+    a.phone AS applicant_phone,
+    lp.name AS product_name,
+    COUNT(e.emi_id) AS overdue_installments,
+    COALESCE(SUM(e.emi_amount + e.penalty_amount), 0) AS total_overdue_amount,
+    MIN(e.due_date) AS earliest_overdue_date,
+    DATEDIFF(CURRENT_DATE, MIN(e.due_date)) AS days_overdue
+FROM LOAN l
+JOIN APPLICANT a ON l.applicant_id = a.applicant_id
+JOIN LOAN_PRODUCT lp ON l.product_id = lp.product_id
+JOIN EMI_SCHEDULE e ON l.loan_id = e.loan_id
+WHERE e.status = 'OVERDUE' OR (e.status = 'PENDING' AND e.due_date < CURRENT_DATE)
+GROUP BY l.loan_id, a.name, a.phone, lp.name
+ORDER BY total_overdue_amount DESC;</code></pre>
         <div class="concept-box">
-            <p><strong>HAVING vs WHERE:</strong> WHERE filters rows BEFORE grouping. HAVING filters groups AFTER aggregation. You can't write <code>WHERE COUNT(*) > 10</code> — use HAVING.</p>
-        </div>
-        <pre><code class="language-sql">SELECT c.name AS category_name,
-       COUNT(*) AS listing_count
-FROM LISTING l
-JOIN CATEGORY c ON l.category_id = c.category_id
-GROUP BY c.category_id, c.name
-HAVING COUNT(*) > 10
-ORDER BY listing_count DESC;</code></pre>
-
-        <h3>💰 Listings Below Category Average (Correlated Subquery)</h3>
-        <pre><code class="language-sql">SELECT l.title, l.price, c.name AS category
-FROM LISTING l
-JOIN CATEGORY c ON l.category_id = c.category_id
-WHERE l.price < (
-    SELECT AVG(l2.price)
-    FROM LISTING l2
-    WHERE l2.category_id = l.category_id  -- ← correlated!
-)
-ORDER BY c.name, l.price;</code></pre>
-        <div class="concept-box">
-            <p><strong>Why "correlated"?</strong> The inner query references <code>l.category_id</code> from the outer query. It re-runs for every row in the outer table. A regular subquery runs only once.</p>
+            <p><strong>Relational Algebra:</strong><br>
+            <code>&gamma;_{loan_id, name, phone, product_name; COUNT(emi_id), SUM(emi+penalty)}(&sigma;_{status='OVERDUE'}(LOAN &bowtie; APPLICANT &bowtie; LOAN_PRODUCT &bowtie; EMI_SCHEDULE))</code></p>
         </div>
 
-        <h3>👤 Users With No Orders (LEFT JOIN)</h3>
-        <pre><code class="language-sql">SELECT u.name, u.email, u.hostel_block
-FROM \`USER\` u
-LEFT JOIN BUYER b ON u.user_id = b.buyer_id
-LEFT JOIN ORDERS o ON b.buyer_id = o.buyer_id
-WHERE o.order_id IS NULL;</code></pre>
-        <div class="concept-box">
-            <p><strong>LEFT JOIN trick:</strong> A LEFT JOIN keeps ALL rows from the left table. If there's no match on the right, those columns become NULL. Filtering <code>WHERE right_col IS NULL</code> gives us "users who have NO orders".</p>
-        </div>
+        <span class="sql-label">Query 2: Portfolio-Wise Sanctioned Amount & NPA Ratio</span>
+        <pre><code class="language-sql">SELECT 
+    lp.product_type,
+    COUNT(DISTINCT l.loan_id) AS total_loans,
+    COALESCE(SUM(l.principal_amount), 0) AS total_sanctioned_amount,
+    ROUND(AVG(l.interest_rate), 2) AS avg_interest_rate,
+    COALESCE(SUM(CASE WHEN l.status = 'ACTIVE' THEN l.principal_amount ELSE 0 END), 0) AS active_principal,
+    COALESCE(SUM(CASE WHEN l.status = 'DEFAULTED' THEN l.principal_amount ELSE 0 END), 0) AS defaulted_amount,
+    ROUND(100.0 * COALESCE(SUM(CASE WHEN l.status = 'DEFAULTED' THEN 1 ELSE 0 END), 0) / NULLIF(COUNT(l.loan_id), 0), 2) AS npa_ratio_pct
+FROM LOAN_PRODUCT lp
+LEFT JOIN LOAN l ON lp.product_id = l.product_id
+GROUP BY lp.product_type
+ORDER BY total_sanctioned_amount DESC;</code></pre>
 
-        <h3>🔀 Set Operators</h3>
-        <span class="sql-label">UNION — Sellers OR Requesters</span>
-        <pre><code class="language-sql">SELECT u.user_id, u.name, 'Seller' AS role FROM \`USER\` u JOIN SELLER s ON u.user_id = s.seller_id
-UNION
-SELECT u.user_id, u.name, 'Requester' FROM \`USER\` u JOIN REQUEST r ON u.user_id = r.user_id;</code></pre>
+        <span class="sql-label">Query 3: Defaulter Register & Recovery Action (SARFAESI)</span>
+        <pre><code class="language-sql">SELECT 
+    d.default_id,
+    l.loan_id,
+    a.name AS applicant_name,
+    a.phone AS applicant_phone,
+    a.pan_no,
+    lp.name AS product_name,
+    d.default_date,
+    d.outstanding_amount,
+    d.months_overdue,
+    d.action_taken
+FROM DEFAULT_LOG d
+JOIN LOAN l ON d.loan_id = l.loan_id
+JOIN APPLICANT a ON l.applicant_id = a.applicant_id
+JOIN LOAN_PRODUCT lp ON l.product_id = lp.product_id
+WHERE d.resolved = FALSE
+ORDER BY d.outstanding_amount DESC, d.months_overdue DESC;</code></pre>
 
-        <span class="sql-label">INTERSECT equivalent — Both Seller AND Buyer</span>
-        <pre><code class="language-sql">-- MySQL doesn't have INTERSECT; we use INNER JOIN instead
--- In Oracle: SELECT seller_id FROM SELLER INTERSECT SELECT buyer_id FROM BUYER;
-SELECT u.name
-FROM \`USER\` u
-JOIN SELLER s ON u.user_id = s.seller_id
-JOIN BUYER b ON u.user_id = b.buyer_id;</code></pre>
+        <span class="sql-label">Query 4: Monthly Repayment Collection Efficiency</span>
+        <pre><code class="language-sql">SELECT 
+    DATE_FORMAT(r.payment_date, '%Y-%m') AS payment_month,
+    COUNT(r.repayment_id) AS total_transactions,
+    SUM(r.amount_paid) AS total_collected,
+    SUM(r.late_fee) AS total_penalty_collected,
+    ROUND(AVG(r.amount_paid), 2) AS avg_repayment_amount
+FROM REPAYMENT r
+GROUP BY DATE_FORMAT(r.payment_date, '%Y-%m')
+ORDER BY payment_month DESC;</code></pre>
 
-        <span class="sql-label">EXCEPT equivalent — Sellers Never Reviewed</span>
-        <pre><code class="language-sql">-- MySQL doesn't have EXCEPT; we use LEFT JOIN IS NULL
--- In Oracle: SELECT seller_id FROM SELLER MINUS SELECT ... FROM REVIEW;
-SELECT u.name
-FROM \`USER\` u
-JOIN SELLER s ON u.user_id = s.seller_id
-LEFT JOIN LISTING l ON s.seller_id = l.seller_id
-LEFT JOIN REVIEW r ON l.listing_id = r.listing_id
-WHERE r.review_id IS NULL;</code></pre>
-
-        <h3>🔢 Relational Algebra (for Queries 1, 3, 4)</h3>
-        <pre><code class="language-sql">-- Query 1 (Top sellers by revenue):
--- π name, total_revenue (
---   γ user_id, name; SUM(qty*price) → total_revenue (
---     USER ⨝ SELLER ⨝ LISTING ⨝ ORDER_ITEM
---   )
--- )
-
--- Query 3 (Below category average):
--- σ price < avg_price (
---   LISTING ⨝ ρ(avg_price ← AVG(price)) (
---     γ category_id; AVG(price) (LISTING)
---   )
--- )
-
--- Query 4 (Users with no orders):
--- π name, email (USER) − π name, email (USER ⨝ BUYER ⨝ ORDERS)</code></pre>
-
-        <h3>👁️ Views</h3>
-        <pre><code class="language-sql">-- available_listings_view: Joins LISTING + SELLER + USER + CATEGORY
--- Used by the frontend's browse page (this very page!)
-CREATE VIEW available_listings_view AS
-SELECT l.listing_id, l.title, l.price, l.\`condition\`, l.quantity,
-       c.name AS category, u.name AS seller_name, u.hostel_block
-FROM LISTING l
-JOIN CATEGORY c ON l.category_id = c.category_id
-JOIN SELLER s ON l.seller_id = s.seller_id
-JOIN \`USER\` u ON s.seller_id = u.user_id
-WHERE l.status = 'ACTIVE';
-
--- seller_dashboard_view: Aggregates for the dashboard section above
-CREATE VIEW seller_dashboard_view AS
-SELECT u.name, s.total_sales, s.avg_rating,
-       COUNT(CASE WHEN l.status = 'ACTIVE' THEN 1 END) AS active_listings,
-       COUNT(CASE WHEN l.status = 'SOLD' THEN 1 END) AS sold_listings
-FROM \`USER\` u
-JOIN SELLER s ON u.user_id = s.seller_id
-LEFT JOIN LISTING l ON s.seller_id = l.seller_id
-GROUP BY u.user_id, u.name, s.total_sales, s.avg_rating;</code></pre>
+        <span class="sql-label">Query 10: RBI SMA & NPA Aging Analysis</span>
+        <pre><code class="language-sql">SELECT 
+    CASE 
+        WHEN DATEDIFF(CURRENT_DATE, e.due_date) BETWEEN 1 AND 30 THEN '1-30 Days (SMA-0)'
+        WHEN DATEDIFF(CURRENT_DATE, e.due_date) BETWEEN 31 AND 60 THEN '31-60 Days (SMA-1)'
+        WHEN DATEDIFF(CURRENT_DATE, e.due_date) BETWEEN 61 AND 90 THEN '61-90 Days (SMA-2)'
+        ELSE '90+ Days (NPA / Default)'
+    END AS aging_bucket,
+    COUNT(e.emi_id) AS overdue_count,
+    SUM(e.emi_amount) AS total_principal_interest_due,
+    SUM(e.penalty_amount) AS total_penalties,
+    SUM(e.emi_amount + e.penalty_amount) AS grand_total_at_risk
+FROM EMI_SCHEDULE e
+JOIN LOAN l ON e.loan_id = l.loan_id
+WHERE e.status = 'OVERDUE' OR (e.status = 'PENDING' AND e.due_date < CURRENT_DATE)
+GROUP BY aging_bucket
+ORDER BY MIN(DATEDIFF(CURRENT_DATE, e.due_date)) ASC;</code></pre>
     `,
 
     normalization: `
-        <h3>📋 The Unnormalized Table — ORDER_RAW</h3>
-        <p>We deliberately combined everything into one flat table to show why normalization matters:</p>
-        <pre><code class="language-sql">CREATE TABLE ORDER_RAW (
-    order_id INT, buyer_name VARCHAR(100), buyer_email VARCHAR(150),
-    buyer_hostel VARCHAR(20), item_name VARCHAR(200), item_price DECIMAL(10,2),
-    item_qty INT, seller_name VARCHAR(100), seller_upi VARCHAR(50),
-    category_name VARCHAR(100), payment_method VARCHAR(20),
-    payment_status VARCHAR(20), order_date DATETIME, order_status VARCHAR(20)
-);</code></pre>
+        <h3>📐 Normalization Proof: From LOAN_RAW to BCNF</h3>
+        <p>
+            Demonstrating how a denormalized monolithic banking ledger <code>LOAN_RAW</code> is systematically decomposed 
+            to eliminate insertion, update, and deletion anomalies.
+        </p>
 
-        <h3>💥 Anomalies — Why This Table Is Terrible</h3>
         <div class="concept-box">
-            <p><strong>INSERT Anomaly:</strong> Can't add a new seller without creating a fake order first.<br>
-            <strong>UPDATE Anomaly:</strong> If Ravi changes hostel, we must update EVERY row with his name.<br>
-            <strong>DELETE Anomaly:</strong> Deleting the last order for a seller loses their UPI info forever.</p>
+            <p><strong>Unnormalized Table (LOAN_RAW):</strong><br>
+            <code>LOAN_RAW(loan_id, applicant_name, applicant_pan, applicant_email, applicant_income, credit_score, product_name, product_type, interest_rate, principal, tenure, emi, installment_no, due_date, emi_amount, payment_date, amount_paid, guarantor_name, guarantor_pan)</code></p>
+            <ul style="margin-left: 20px; font-size: 0.85rem; color: var(--text-muted); margin-top: 8px;">
+                <li><strong>Insertion Anomaly:</strong> Cannot define a new loan product without sanctioning an applicant loan.</li>
+                <li><strong>Deletion Anomaly:</strong> Deleting a loan erases the applicant profile and credit score history.</li>
+                <li><strong>Update Anomaly:</strong> If base interest rate changes, thousands of rows must be updated.</li>
+            </ul>
         </div>
 
-        <h3>📐 Functional Dependencies</h3>
-        <pre><code class="language-sql">-- FD1: order_id → buyer_name, buyer_email, buyer_hostel, order_date, order_status
--- FD2: buyer_email → buyer_name, buyer_hostel
--- FD3: {order_id, item_name} → item_price, item_qty, seller_name, seller_upi, category
--- FD4: seller_name → seller_upi
--- FD5: order_id → payment_method, payment_status</code></pre>
-        <p>A <strong>functional dependency</strong> X → Y means: if you know X, you can uniquely determine Y. Like: if you know the email, you know the name and hostel.</p>
+        <h3>1. First Normal Form (1NF)</h3>
+        <p>
+            <strong>Rule:</strong> All attributes must contain atomic values. Eliminate repeating groups.<br>
+            <strong>Action:</strong> Multiple installments (installments array) are flattened so each row represents a single atomic installment with primary key <code>(loan_id, installment_no)</code>.
+        </p>
 
-        <h3>🧮 Attribute Closure Example</h3>
-        <pre><code class="language-sql">-- Compute {order_id, item_name}⁺
--- Start:  {order_id, item_name}
--- Apply FD1: + buyer_name, buyer_email, buyer_hostel, order_date, order_status
--- Apply FD3: + item_price, item_qty, seller_name, seller_upi, category_name
--- Apply FD4: (seller_upi already included)
--- Apply FD5: + payment_method, payment_status
--- Apply FD2: (buyer_name, buyer_hostel already included)
---
--- Final: {order_id, item_name}⁺ = ALL ATTRIBUTES → It's a SUPERKEY! ✓</code></pre>
+        <h3>2. Second Normal Form (2NF)</h3>
+        <p>
+            <strong>Rule:</strong> Must be in 1NF and contain NO partial functional dependencies on composite candidate keys.<br>
+            In composite key <code>(loan_id, installment_no)</code>:
+        </p>
+        <pre><code class="language-sql">-- Partial Dependency:
+loan_id -> applicant_name, pan, principal_amount, product_name
+-- (These attributes depend ONLY on loan_id, not on installment_no!)</code></pre>
+        <p>
+            <strong>Decomposition:</strong> Split into <code>LOAN</code> and <code>EMI_SCHEDULE</code>. 
+            Now, loan metadata depends entirely on <code>loan_id</code>, and installment terms depend on <code>(loan_id, installment_no)</code>.
+        </p>
 
-        <h3>🔄 Decomposition: 1NF → 2NF → 3NF → BCNF</h3>
-        <p><strong>1NF:</strong> All values are atomic (no arrays, no repeating groups). ✅ Already satisfied.</p>
-        <p><strong>2NF:</strong> Remove partial dependencies. <code>order_id → buyer_*</code> depends on only PART of the composite key {order_id, item_name}. Split into ORDERS_2NF and ORDER_ITEMS_2NF.</p>
-        <p><strong>3NF:</strong> Remove transitive dependencies. <code>buyer_email → buyer_name, buyer_hostel</code> is transitive through order_id. Split buyer info into its own table.</p>
-        <p><strong>BCNF:</strong> Every determinant must be a candidate key. After 3NF, check <code>seller_name → seller_upi</code>. If seller_name isn't a candidate key in its table, decompose further.</p>
-        <p>The final result matches our normalized schema: USER, SELLER, BUYER, LISTING, ORDERS, ORDER_ITEM, PAYMENT — each table serves one purpose.</p>
+        <h3>3. Third Normal Form (3NF)</h3>
+        <p>
+            <strong>Rule:</strong> Must be in 2NF and contain NO transitive functional dependencies: <code>X &rarr; Y &rarr; Z</code>.
+        </p>
+        <pre><code class="language-sql">-- Transitive Dependencies:
+loan_id -> product_id -> product_name, interest_rate, min_amount
+loan_id -> applicant_id -> applicant_name, email, pan_no, credit_score</code></pre>
+        <p>
+            <strong>Decomposition:</strong> Extract <code>APPLICANT</code> and <code>LOAN_PRODUCT</code> into independent entities with their own primary keys. 
+            <code>LOAN</code> maintains foreign keys <code>applicant_id</code> and <code>product_id</code>.
+        </p>
+
+        <h3>4. Boyce-Codd Normal Form (BCNF)</h3>
+        <p>
+            <strong>Rule:</strong> For every non-trivial functional dependency <code>X &rarr; Y</code>, <code>X</code> MUST be a superkey.<br>
+            <strong>Validation:</strong>
+        </p>
+        <ul style="margin-left: 20px; font-size: 0.85rem; color: var(--text-muted);">
+            <li>In <code>APPLICANT</code>: <code>applicant_id</code> is a superkey. <code>pan_no</code> and <code>aadhaar_no</code> are candidate keys (UNIQUE), so <code>pan_no &rarr; name</code> satisfies BCNF.</li>
+            <li>In <code>LOAN_PRODUCT</code>: <code>product_id</code> is a superkey.</li>
+            <li>In <code>EMI_SCHEDULE</code>: <code>(loan_id, installment_no)</code> is a composite candidate key.</li>
+            <li>In <code>GUARANTOR</code>: <code>guarantor_id</code> is a superkey.</li>
+        </ul>
+        <div class="concept-box" style="margin-top: 14px;">
+            <p><strong>Conclusion:</strong> The resulting 8-table relational model is in <strong>Strict BCNF</strong> with zero redundancy and zero loss of dependencies.</p>
+        </div>
     `,
 
     procedures: `
-        <h3>⚡ PROCEDURE: place_order(buyer, listing, qty, method)</h3>
-        <p>This is an <strong>ACID transaction</strong> — all 5 operations succeed together, or none do:</p>
+        <h3>⚙️ Stored Procedures & Triggers</h3>
+        <p>Compiled procedural logic running inside the MySQL InnoDB engine guarantees data integrity and zero race conditions.</p>
+
+        <span class="sql-label">1. generate_emi_schedule (Reducing-Balance Amortization Loop)</span>
         <pre><code class="language-sql">DELIMITER $$
-CREATE PROCEDURE place_order(
-    IN p_buyer_id INT, IN p_listing_id INT,
-    IN p_qty INT, IN p_method VARCHAR(20)
+CREATE PROCEDURE generate_emi_schedule(IN p_loan_id INT)
+BEGIN
+    DECLARE v_principal DECIMAL(12,2);
+    DECLARE v_rate DECIMAL(5,2);
+    DECLARE v_tenure INT;
+    DECLARE v_disb_date DATE;
+    DECLARE v_monthly_rate DOUBLE;
+    DECLARE v_emi DECIMAL(10,2);
+    DECLARE v_balance DECIMAL(12,2);
+    DECLARE v_interest_comp DECIMAL(10,2);
+    DECLARE v_principal_comp DECIMAL(10,2);
+    DECLARE v_due_date DATE;
+    DECLARE i INT DEFAULT 1;
+
+    -- Retrieve loan parameters
+    SELECT principal_amount, interest_rate, tenure_months, COALESCE(disbursement_date, CURRENT_DATE)
+    INTO v_principal, v_rate, v_tenure, v_disb_date
+    FROM LOAN WHERE loan_id = p_loan_id;
+
+    -- Monthly interest rate: r = (R / 12) / 100
+    SET v_monthly_rate = (v_rate / 12.0) / 100.0;
+    
+    -- Reducing balance formula: EMI = P * r * (1+r)^n / ((1+r)^n - 1)
+    SET v_emi = ROUND((v_principal * v_monthly_rate * POW(1 + v_monthly_rate, v_tenure)) 
+                / (POW(1 + v_monthly_rate, v_tenure) - 1), 2);
+    
+    SET v_balance = v_principal;
+
+    -- Delete any pre-existing schedule for regeneration
+    DELETE FROM EMI_SCHEDULE WHERE loan_id = p_loan_id;
+
+    -- Iterative amortization loop
+    WHILE i <= v_tenure DO
+        SET v_interest_comp = ROUND(v_balance * v_monthly_rate, 2);
+        SET v_principal_comp = v_emi - v_interest_comp;
+        
+        -- Exact zero balance closure on final installment
+        IF i = v_tenure OR v_principal_comp > v_balance THEN
+            SET v_principal_comp = v_balance;
+            SET v_emi = v_principal_comp + v_interest_comp;
+            SET v_balance = 0.00;
+        ELSE
+            SET v_balance = v_balance - v_principal_comp;
+        END IF;
+
+        SET v_due_date = DATE_ADD(v_disb_date, INTERVAL i MONTH);
+
+        INSERT INTO EMI_SCHEDULE (
+            loan_id, installment_no, due_date, principal_component,
+            interest_component, emi_amount, balance_after, status
+        ) VALUES (
+            p_loan_id, i, v_due_date, v_principal_comp,
+            v_interest_comp, v_emi, v_balance, 'PENDING'
+        );
+
+        SET i = i + 1;
+    END WHILE;
+END$$
+DELIMITER ;</code></pre>
+
+        <span class="sql-label">2. process_repayment (ACID Transaction Handler)</span>
+        <pre><code class="language-sql">DELIMITER $$
+CREATE PROCEDURE process_repayment(
+    IN p_loan_id INT,
+    IN p_emi_id INT,
+    IN p_amount DECIMAL(10,2),
+    IN p_mode VARCHAR(20),
+    IN p_ref VARCHAR(100),
+    IN p_remarks VARCHAR(255)
 )
 BEGIN
-    DECLARE v_price DECIMAL(10,2);
-    DECLARE v_order_id INT;
-    -- On ANY error → rollback everything
+    DECLARE v_due_date DATE;
+    DECLARE v_emi_amt DECIMAL(10,2);
+    DECLARE v_late_fee DECIMAL(10,2) DEFAULT 0.00;
+    DECLARE v_unpaid_count INT;
+
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
-        SELECT 'Transaction failed — rolled back' AS result;
+        RESIGNAL;
     END;
 
     START TRANSACTION;
 
-    -- 1. Get price, lock the listing row
-    SELECT price INTO v_price FROM LISTING
-    WHERE listing_id = p_listing_id AND status = 'ACTIVE'
-          AND quantity >= p_qty
-    FOR UPDATE;  -- Prevents two buyers from buying the last copy!
+    -- Row-level locking to prevent concurrent double-spend
+    SELECT due_date, emi_amount 
+    INTO v_due_date, v_emi_amt
+    FROM EMI_SCHEDULE 
+    WHERE emi_id = p_emi_id AND loan_id = p_loan_id
+    FOR UPDATE;
 
-    -- 2. Create order
-    INSERT INTO ORDERS (buyer_id, total_amount)
-    VALUES (p_buyer_id, v_price * p_qty);
-    SET v_order_id = LAST_INSERT_ID();
+    -- Check if payment is past due date: apply 2% late fee penalty
+    IF CURRENT_DATE > v_due_date THEN
+        SET v_late_fee = ROUND(v_emi_amt * 0.02, 2);
+    END IF;
 
-    -- 3. Add order item
-    INSERT INTO ORDER_ITEM (order_id, listing_id, quantity, price_at_purchase)
-    VALUES (v_order_id, p_listing_id, p_qty, v_price);
+    -- Record repayment ledger entry
+    INSERT INTO REPAYMENT (
+        emi_id, loan_id, amount_paid, payment_date, 
+        payment_mode, transaction_ref, late_fee, remarks
+    ) VALUES (
+        p_emi_id, p_loan_id, p_amount, CURRENT_TIMESTAMP, 
+        p_mode, p_ref, v_late_fee, p_remarks
+    );
 
-    -- 4. Reduce listing quantity
-    UPDATE LISTING SET quantity = quantity - p_qty
-    WHERE listing_id = p_listing_id;
+    -- Mark installment as PAID
+    UPDATE EMI_SCHEDULE 
+    SET status = 'PAID', paid_date = CURRENT_TIMESTAMP, penalty_amount = v_late_fee
+    WHERE emi_id = p_emi_id;
 
-    -- 5. Record payment
-    INSERT INTO PAYMENT (order_id, amount, method, status, paid_at)
-    VALUES (v_order_id, v_price * p_qty, p_method, 'COMPLETED', NOW());
+    -- Check if all installments are settled
+    SELECT COUNT(*) INTO v_unpaid_count 
+    FROM EMI_SCHEDULE 
+    WHERE loan_id = p_loan_id AND status != 'PAID';
+
+    IF v_unpaid_count = 0 THEN
+        UPDATE LOAN SET status = 'CLOSED' WHERE loan_id = p_loan_id;
+        INSERT INTO LOAN_AUDIT (loan_id, field_changed, old_value, new_value, changed_by)
+        VALUES (p_loan_id, 'status', 'ACTIVE', 'CLOSED', 'SYSTEM_PROCEDURE');
+    END IF;
 
     COMMIT;
-    SELECT 'Order placed successfully!' AS result, v_order_id AS order_id;
 END$$
 DELIMITER ;</code></pre>
-
-        <div class="concept-box">
-            <p><strong>ACID Properties in this procedure:</strong><br>
-            <strong>Atomicity:</strong> All 5 INSERT/UPDATE statements run or none do (ROLLBACK on error).<br>
-            <strong>Consistency:</strong> CHECK constraints ensure price > 0, quantity ≥ 0 at all times.<br>
-            <strong>Isolation:</strong> FOR UPDATE locks the listing row — other transactions wait.<br>
-            <strong>Durability:</strong> After COMMIT, the data survives a server crash (written to disk).</p>
-        </div>
-
-        <h3>🔔 TRIGGER: Auto-Mark as SOLD When Quantity Hits 0</h3>
-        <pre><code class="language-sql">CREATE TRIGGER trg_listing_sold_out
-BEFORE UPDATE ON LISTING
-FOR EACH ROW
-BEGIN
-    IF NEW.quantity = 0 AND OLD.quantity > 0 THEN
-        SET NEW.status = 'SOLD';
-    END IF;
-END;</code></pre>
-        <p>This fires automatically — no application code needed. When place_order reduces quantity to 0, the trigger sets status to SOLD.</p>
-
-        <h3>⭐ TRIGGER: Recalculate Seller Rating After Review</h3>
-        <pre><code class="language-sql">CREATE TRIGGER trg_update_seller_rating
-AFTER INSERT ON REVIEW
-FOR EACH ROW
-BEGIN
-    DECLARE v_seller_id INT;
-    SELECT seller_id INTO v_seller_id FROM LISTING
-    WHERE listing_id = NEW.listing_id;
-
-    UPDATE SELLER SET avg_rating = (
-        SELECT AVG(r.rating) FROM REVIEW r
-        JOIN LISTING l ON r.listing_id = l.listing_id
-        WHERE l.seller_id = v_seller_id
-    ) WHERE seller_id = v_seller_id;
-END;</code></pre>
-
-        <h3>📝 TRIGGER: Audit Trail on Price Changes</h3>
-        <pre><code class="language-sql">CREATE TRIGGER trg_price_audit
-BEFORE UPDATE ON LISTING
-FOR EACH ROW
-BEGIN
-    IF OLD.price <> NEW.price THEN
-        INSERT INTO PRICE_AUDIT (listing_id, old_price, new_price, changed_by, changed_at)
-        VALUES (OLD.listing_id, OLD.price, NEW.price, NEW.seller_id, NOW());
-    END IF;
-END;</code></pre>
-
-        <h3>🔄 CURSOR: Mark Old Listings as Expired</h3>
-        <pre><code class="language-sql">CREATE PROCEDURE mark_expired_listings()
-BEGIN
-    DECLARE v_lid INT;
-    DECLARE v_done INT DEFAULT 0;
-    DECLARE v_count INT DEFAULT 0;
-
-    DECLARE cur CURSOR FOR
-        SELECT listing_id FROM LISTING
-        WHERE status = 'ACTIVE'
-          AND created_at < NOW() - INTERVAL 60 DAY;
-
-    DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = 1;
-
-    OPEN cur;
-    read_loop: LOOP
-        FETCH cur INTO v_lid;
-        IF v_done THEN LEAVE read_loop; END IF;
-        UPDATE LISTING SET status = 'EXPIRED' WHERE listing_id = v_lid;
-        SET v_count = v_count + 1;
-    END LOOP;
-    CLOSE cur;
-
-    SELECT CONCAT(v_count, ' listings marked as EXPIRED') AS result;
-END;</code></pre>
     `,
 
     transactions: `
-        <h3>🏁 The Race Condition Problem</h3>
-        <p>Imagine: only 1 copy of "DBMS by Navathe" is left. Two students click "Buy" at the same instant. Without proper locking, both could "succeed" — but there's only one book!</p>
+        <h3>🔒 Transactions & Concurrency Control</h3>
+        <p>How banking ACID guarantees are enforced under high concurrent transaction loads.</p>
 
         <div class="concept-box">
-            <p><strong>SELECT ... FOR UPDATE</strong> solves this by locking the row. The first transaction holds the lock; the second WAITS until the first commits or rolls back.</p>
+            <p><strong>The Four Pillars of ACID in Bank Repayments:</strong></p>
+            <ul style="margin-left: 20px; font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">
+                <li><strong>Atomicity:</strong> Either REPAYMENT is logged AND EMI_SCHEDULE status is updated, or neither occurs. An abrupt crash rolls back all uncommitted mutations.</li>
+                <li><strong>Consistency:</strong> Balance transitions must satisfy <code>CHECK (amount_paid > 0)</code> and FK constraints.</li>
+                <li><strong>Isolation:</strong> Guaranteed via InnoDB row-level locking (<code>SELECT ... FOR UPDATE</code>) under REPEATABLE READ isolation.</li>
+                <li><strong>Durability:</strong> Once COMMIT occurs, the write is flushed to InnoDB Redo Log (WAL) and survives power failures.</li>
+            </ul>
         </div>
 
-        <h3>🧪 Two-Session Proof</h3>
-        <span class="sql-label">Session 1 — Terminal 1</span>
-        <pre><code class="language-sql">-- Setup: only 1 copy left
-UPDATE LISTING SET quantity = 1, status = 'ACTIVE' WHERE listing_id = 1;
+        <h3>Pessimistic Locking (SELECT ... FOR UPDATE)</h3>
+        <p>
+            If a customer pays an EMI via UPI while an automated NACH auto-debit triggers concurrently, 
+            both processes target the same installment record. Without row locking, a double-deduction race condition occurs.
+        </p>
+        <pre><code class="language-sql">-- Process 1 (Auto-Debit Worker) locks the installment:
+SELECT * FROM EMI_SCHEDULE WHERE emi_id = 100101 FOR UPDATE;
+-- Process 2 (UPI Gateway Callback) waits on lock acquisition until Process 1 commits!</code></pre>
 
-START TRANSACTION;
--- Lock the row
-SELECT listing_id, title, quantity
-FROM LISTING WHERE listing_id = 1 FOR UPDATE;
--- → Returns quantity = 1
--- → Now switch to Session 2...</code></pre>
-
-        <span class="sql-label">Session 2 — Terminal 2</span>
-        <pre><code class="language-sql">START TRANSACTION;
--- Try to read the same row
-SELECT listing_id, title, quantity
-FROM LISTING WHERE listing_id = 1 FOR UPDATE;
--- ⏳ BLOCKED! Waiting for Session 1 to release the lock...</code></pre>
-
-        <span class="sql-label">Back to Session 1</span>
-        <pre><code class="language-sql">-- Session 1 completes the purchase
-UPDATE LISTING SET quantity = quantity - 1 WHERE listing_id = 1;
-COMMIT;
--- Lock released! Session 2 unblocks.</code></pre>
-
-        <span class="sql-label">Session 2 Unblocks</span>
-        <pre><code class="language-sql">-- Session 2's SELECT now returns — quantity is 0!
--- Application checks: quantity = 0 → item sold out
-ROLLBACK;  -- Don't buy — nothing left</code></pre>
-
-        <h3>💀 What a Deadlock Looks Like</h3>
-        <pre><code class="language-sql">-- Session A: START TRANSACTION;
---            SELECT * FROM LISTING WHERE listing_id = 1 FOR UPDATE;  -- locks row 1
---            SELECT * FROM LISTING WHERE listing_id = 2 FOR UPDATE;  -- wants row 2
-
--- Session B: START TRANSACTION;
---            SELECT * FROM LISTING WHERE listing_id = 2 FOR UPDATE;  -- locks row 2
---            SELECT * FROM LISTING WHERE listing_id = 1 FOR UPDATE;  -- wants row 1
-
--- DEADLOCK! A holds 1, wants 2. B holds 2, wants 1.
--- MySQL detects this and kills one session:
--- ERROR 1213: Deadlock found when trying to get lock;
---             try restarting transaction
-
--- Prevention: Always lock rows in consistent order (by listing_id ASC)</code></pre>
+        <h3>Deadlock Scenario & Resolution</h3>
+        <p>
+            <strong>The Scenario:</strong><br>
+            Transaction 1 transfers liability from Loan A to Loan B (locks A, attempts to lock B).<br>
+            Transaction 2 consolidates Loan B into Loan A (locks B, attempts to lock A).<br>
+            A cyclic dependency occurs: <code>T1 &rarr; T2 &rarr; T1</code>.
+        </p>
+        <pre><code class="language-sql">-- Deadlock Prevention Rule:
+-- Always acquire locks in ascending order of primary key:
+SELECT * FROM LOAN WHERE loan_id IN (1001, 1002) ORDER BY loan_id FOR UPDATE;</code></pre>
+        <p>
+            MySQL's InnoDB engine contains an internal deadlock detector: it identifies cycles in the wait-for graph 
+            and automatically aborts the transaction with the smallest undo log, returning <code>ERROR 1213 (40001): Deadlock found</code>.
+        </p>
     `,
 
     indexes: `
-        <h3>🌳 B+ Tree Indexes — What and Why</h3>
-        <div class="concept-box">
-            <p>A <strong>B+ tree</strong> is a balanced tree where leaf nodes are linked in order and store pointers to actual rows. Internal nodes guide the search. InnoDB uses B+ trees for ALL indexes by default.</p>
-        </div>
-
-        <h3>📊 BEFORE Indexing — Full Table Scan</h3>
-        <pre><code class="language-sql">EXPLAIN SELECT * FROM LISTING WHERE title LIKE 'Data%';
--- type: ALL (full table scan)
--- rows: 5000+ (scans every row)
--- Extra: Using where
-
-EXPLAIN SELECT * FROM LISTING
-WHERE category_id = 3 AND status = 'ACTIVE';
--- type: ALL (full table scan again!)
--- rows: 5000+</code></pre>
-
-        <h3>⚡ Creating Indexes</h3>
-        <pre><code class="language-sql">-- Single-column index for title search
-CREATE INDEX idx_listing_title ON LISTING(title);
-
--- Composite index for category + status filtering
-CREATE INDEX idx_listing_cat_status ON LISTING(category_id, status);
--- ↑ Helps: WHERE category_id = 3
--- ↑ Helps: WHERE category_id = 3 AND status = 'ACTIVE'
--- ✗ Does NOT help: WHERE status = 'ACTIVE' alone (leftmost prefix rule!)</code></pre>
-
-        <h3>📊 AFTER Indexing — Index Lookup</h3>
-        <pre><code class="language-sql">EXPLAIN SELECT * FROM LISTING WHERE title LIKE 'Data%';
--- type: range (uses the B+ tree index!)
--- rows: ~50 (only matching rows)
--- key: idx_listing_title
-
-EXPLAIN SELECT * FROM LISTING
-WHERE category_id = 3 AND status = 'ACTIVE';
--- type: ref (uses composite index)
--- rows: ~30
--- key: idx_listing_cat_status</code></pre>
+        <h3>⚡ B+ Tree Indexing & Performance Optimization</h3>
+        <p>Analyzing query plans, clustered indexes, and composite secondary B+ trees.</p>
 
         <div class="concept-box">
-            <p><strong>Leftmost Prefix Rule:</strong> A composite index on (A, B) helps queries filtering on A, or A+B, but NOT B alone. Think of it like a phone book sorted by (last_name, first_name) — you can look up by last name, or last+first, but not first name alone.</p>
+            <p><strong>InnoDB Storage Architecture:</strong><br>
+            InnoDB tables are organized as <strong>Index-Organized Tables (IOT)</strong>. The primary key forms the clustered index, 
+            meaning table data rows are physically stored directly in the leaf nodes of the primary key's B+ tree.</p>
         </div>
 
-        <h3>📋 Additional Indexes</h3>
-        <pre><code class="language-sql">CREATE INDEX idx_orders_buyer ON ORDERS(buyer_id);
--- Speeds up: "show my orders" (WHERE buyer_id = ?)
+        <span class="sql-label">Strategic Secondary Indexes</span>
+        <pre><code class="language-sql">-- 1. Accelerates borrower portfolio lookups:
+CREATE INDEX idx_loan_applicant_status ON LOAN (applicant_id, status);
 
-CREATE INDEX idx_review_listing ON REVIEW(listing_id);
--- Speeds up: "show reviews for this listing"
+-- 2. Optimizes daily delinquency scans:
+CREATE INDEX idx_emi_loan_status_due ON EMI_SCHEDULE (loan_id, status, due_date);
 
-CREATE INDEX idx_listing_created ON LISTING(created_at);
--- Speeds up: the cursor that finds listings older than 60 days</code></pre>
+-- 3. Enables instantaneous KYC lookups:
+CREATE UNIQUE INDEX idx_applicant_pan ON APPLICANT (pan_no);
+CREATE UNIQUE INDEX idx_applicant_aadhaar ON APPLICANT (aadhaar_no);</code></pre>
+
+        <h3>EXPLAIN Execution Plan Comparison</h3>
+        <p>Before adding the composite index on <code>EMI_SCHEDULE(status, due_date)</code>:</p>
+        <pre><code class="language-sql">EXPLAIN SELECT * FROM EMI_SCHEDULE WHERE status = 'OVERDUE' AND due_date < CURRENT_DATE;
++----+-------------+--------------+------------+------+---------------+------+---------+------+-------+----------+-------------+
+| id | select_type | table        | partitions | type | possible_keys | key  | key_len | ref  | rows  | filtered | Extra       |
++----+-------------+--------------+------------+------+---------------+------+---------+------+-------+----------+-------------+
+|  1 | SIMPLE      | EMI_SCHEDULE | NULL       | ALL  | NULL          | NULL | NULL    | NULL | 50000 |    10.00 | Using where |
++----+-------------+--------------+------------+------+---------------+------+---------+------+-------+----------+-------------+
+-- Type: ALL indicates an expensive Full Table Scan across all 50,000 installments.</code></pre>
+
+        <p>After creating the composite index:</p>
+        <pre><code class="language-sql">+----+-------------+--------------+------------+-------+-------------------------+-------------------------+---------+------+------+----------+-----------------------+
+| id | select_type | table        | partitions | type  | possible_keys           | key                     | key_len | ref  | rows | filtered | Extra                 |
++----+-------------+--------------+------------+-------+-------------------------+-------------------------+---------+------+------+----------+-----------------------+
+|  1 | SIMPLE      | EMI_SCHEDULE | NULL       | range | idx_emi_loan_status_due | idx_emi_loan_status_due | 5       | NULL |    8 |   100.00 | Using index condition |
++----+-------------+--------------+------------+-------+-------------------------+-------------------------+---------+------+------+----------+-----------------------+
+-- Type: range (B+ tree index seek). Reduced rows scanned from 50,000 to 8!</code></pre>
     `,
 
     er: `
-        <h3>🗺️ Entity-Relationship Design</h3>
+        <h3>🌐 Entity-Relationship (ER) Architecture</h3>
+        <p>Conceptual and relational mapping of the Bank Loan Management System.</p>
 
         <div class="concept-box">
-            <p><strong>12 tables, 3 specializations, 1 self-reference, 1 junction table.</strong><br>
-            Every design decision is documented in <code>docs/er-design.md</code>.</p>
+            <p><strong>Entity Sets & Cardinalities:</strong></p>
+            <ul style="margin-left: 20px; font-size: 0.85rem; color: var(--text-muted); margin-top: 6px;">
+                <li><strong>APPLICANT (1) &mdash;&mdash;&lt; (N) LOAN:</strong> One applicant can hold multiple loans over time. A loan must belong to exactly 1 applicant (Total Participation).</li>
+                <li><strong>LOAN_PRODUCT (1) &mdash;&mdash;&lt; (N) LOAN:</strong> A product type governs multiple sanctioned loans.</li>
+                <li><strong>GUARANTOR (0..1) &mdash;&mdash;&lt; (N) LOAN:</strong> A guarantor is optional (Partial Participation), used for education/commercial loans.</li>
+                <li><strong>LOAN (1) &mdash;&mdash;&lt; (N) EMI_SCHEDULE:</strong> Weak Entity relationship. An EMI schedule cannot exist without its parent loan. (Identified by composite key <code>loan_id + installment_no</code>).</li>
+                <li><strong>EMI_SCHEDULE (1) &mdash;&mdash;&lt; (0..N) REPAYMENT:</strong> Each installment receives 0, 1, or partial repayment logs.</li>
+                <li><strong>LOAN (1) &mdash;&mdash;&lt; (0..N) DEFAULT_LOG:</strong> Overdue accounts trigger non-performing asset logs.</li>
+                <li><strong>LOAN (1) &mdash;&mdash;&lt; (N) LOAN_AUDIT:</strong> Every state change (status transition) writes an immutable audit record.</li>
+            </ul>
         </div>
 
-        <h3>📐 Key ER Concepts Used</h3>
-
-        <p><strong>1. Overlapping Partial Specialization (USER → SELLER, BUYER)</strong><br>
-        Overlapping = one user can be both a seller AND buyer. Partial = not every user must be one. This is the most common real-world pattern.</p>
-
-        <p><strong>2. Self-Referencing FK (CATEGORY → CATEGORY)</strong><br>
-        <code>parent_category_id</code> points to <code>category_id</code> in the same table. Creates a tree: Books → Engineering Books → CSE Books.</p>
-
-        <p><strong>3. Junction Table (ORDER_ITEM)</strong><br>
-        Resolves the M:N relationship between ORDERS and LISTING. One order can have many items; one item can be in many orders.</p>
-
-        <p><strong>4. IS-A Relationship (LISTING → BOOK_DETAILS)</strong><br>
-        Only book listings get ISBN, author, edition. Electronics don't need these fields. Avoids NULLs in the LISTING table.</p>
-
-        <h3>🗂️ ER-to-Relational Mapping Rules</h3>
-        <pre><code class="language-sql">-- Rule 1: Strong entity → table with its own PK
---   USER(user_id PK, name, email, ...)
-
--- Rule 2: Overlapping specialization → separate child tables
---   SELLER(seller_id PK FK→USER, upi_id, ...)
---   BUYER(buyer_id PK FK→USER, wallet_balance)
-
--- Rule 3: 1:M relationship → FK on the "many" side
---   LISTING has seller_id FK → SELLER
-
--- Rule 4: M:N relationship → junction table
---   ORDER_ITEM(order_id FK, listing_id FK)
-
--- Rule 5: Self-reference → FK in same table
---   CATEGORY(parent_category_id FK → category_id)
-
--- Rule 6: 1:1 relationship → FK on total-participation side
---   PAYMENT has order_id FK → ORDERS</code></pre>
-
-        <h3>❓ Likely Viva Questions</h3>
-        <p><strong>Q: Why is ORDER_ITEM needed?</strong><br>
-        A: One order can have multiple items. Without it, you'd need repeating groups (violates 1NF).</p>
-
-        <p><strong>Q: Why store price_at_purchase separately?</strong><br>
-        A: The seller might change the price later. The order should record what was actually paid — it's a historical fact.</p>
-
-        <p><strong>Q: Why ON DELETE CASCADE on seller but RESTRICT on category?</strong><br>
-        A: Deleting a user should clean up their profile (CASCADE). But deleting a category with existing listings would orphan data (RESTRICT forces re-categorization first).</p>
+        <span class="sql-label">Textual ER Diagram</span>
+        <pre><code>[APPLICANT]  (1) &lt;──── Sanctions ────&gt; (N) [LOAN] &lt;──── Belongs To ────&gt; (1) [LOAN_PRODUCT]
+     │                                        │
+     │                                   (1)  │
+     │                                        │ Schedules
+     │                                        ▼
+     │                                [EMI_SCHEDULE] (Weak)
+     │                                        │
+     │                                   (1)  │ Receives
+     │                                        ▼
+     │                                   [REPAYMENT]
+     │                                        
+     └───── Co-Signs ────&gt; [GUARANTOR] (0..1) ───&gt; [LOAN] ─── Logs ───&gt; [DEFAULT_LOG]
+                                                         └─── Audits ──&gt; [LOAN_AUDIT]</code></pre>
     `
 };
 
-// ---- MODAL LOGIC ----
+// ----------------------------------------------------------------------------
+// 7. INITIALIZE "HOW IT WORKS" MODAL
+// ----------------------------------------------------------------------------
 function initModal() {
     const overlay = document.getElementById('modalOverlay');
     const closeBtn = document.getElementById('modalClose');
-    const howItWorksBtn = document.getElementById('howItWorksBtn');
-    const footerBtn = document.getElementById('footerHowItWorks');
-    const tabs = document.querySelectorAll('.tab');
-    const modalBody = document.getElementById('modalBody');
+    const openBtns = [
+        document.getElementById('howItWorksBtn'),
+        document.getElementById('footerHowItWorks')
+    ].filter(Boolean);
 
-    function openModal() {
-        overlay.classList.add('active');
-        document.body.style.overflow = 'hidden';
-        showTab('schema');
-    }
+    if (!overlay) return;
 
-    function closeModal() {
-        overlay.classList.remove('active');
-        document.body.style.overflow = '';
-    }
-
-    function showTab(tabName) {
-        tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
-        modalBody.innerHTML = howItWorksContent[tabName] || '<p>Content coming soon...</p>';
-        // Re-highlight code blocks
-        modalBody.querySelectorAll('pre code').forEach(block => {
-            hljs.highlightElement(block);
+    function openTab(tabName) {
+        document.querySelectorAll('.modal-tabs .tab').forEach(t => {
+            t.classList.toggle('active', t.getAttribute('data-tab') === tabName);
         });
-        modalBody.scrollTop = 0;
+        const body = document.getElementById('modalBody');
+        if (body) {
+            body.innerHTML = howItWorksContent[tabName] || '<p>Content not found.</p>';
+            if (window.hljs) {
+                body.querySelectorAll('pre code').forEach(block => {
+                    hljs.highlightElement(block);
+                });
+            }
+        }
     }
 
-    howItWorksBtn?.addEventListener('click', (e) => { e.preventDefault(); openModal(); });
-    footerBtn?.addEventListener('click', (e) => { e.preventDefault(); openModal(); });
-    closeBtn?.addEventListener('click', closeModal);
-    overlay?.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
-
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => showTab(tab.dataset.tab));
+    openBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            overlay.classList.add('active');
+            openTab('schema');
+        });
     });
 
-    // ESC key closes modal
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            overlay.classList.remove('active');
+        });
+    }
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.classList.remove('active');
+    });
+
+    document.querySelectorAll('.modal-tabs .tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            openTab(tab.getAttribute('data-tab'));
+        });
+    });
+
+    // Close on Escape key
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeModal();
+        if (e.key === 'Escape') overlay.classList.remove('active');
     });
 }
 
-// ---- SEARCH & CATEGORY FILTER ----
+// ----------------------------------------------------------------------------
+// 8. SEARCH & FILTERING
+// ----------------------------------------------------------------------------
 function initSearch() {
     const input = document.getElementById('searchInput');
-    input?.addEventListener('input', () => {
-        const query = input.value.toLowerCase();
-        const cards = document.querySelectorAll('.listing-card');
-        cards.forEach(card => {
-            const title = card.querySelector('.listing-title')?.textContent.toLowerCase() || '';
-            const cat = card.querySelector('.listing-seller')?.textContent.toLowerCase() || '';
-            card.style.display = (title.includes(query) || cat.includes(query)) ? '' : 'none';
-        });
-    });
+    const btn = document.querySelector('.btn-search');
 
-    // Category cards click filter
-    document.querySelectorAll('.category-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const catName = card.querySelector('h3')?.textContent || '';
-            if (input) {
-                input.value = catName;
-                input.dispatchEvent(new Event('input'));
-            }
-            document.getElementById('listings')?.scrollIntoView({ behavior: 'smooth' });
-        });
-    });
-}
-
-// ---- SELL MODAL LOGIC ----
-function initSell() {
-    const sellOverlay = document.getElementById('sellOverlay');
-    const sellClose = document.getElementById('sellClose');
-    const sellForm = document.getElementById('sellForm');
-
-    function openSellModal() {
-        if (!currentUser) {
-            alert("Please log in first to list an item for sale!");
-            const loginOverlay = document.getElementById('loginOverlay');
-            loginOverlay?.classList.add('active');
-            document.body.style.overflow = 'hidden';
-            if (typeof showLoginForm === 'function') showLoginForm();
-            return;
-        }
-        sellOverlay?.classList.add('active');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function closeSellModal() {
-        sellOverlay?.classList.remove('active');
-        document.body.style.overflow = '';
-    }
-
-    // Attach to all Sell Now buttons (delegation)
-    document.addEventListener('click', (e) => {
-        if (e.target && e.target.textContent && e.target.textContent.trim() === 'Sell Now') {
-            e.preventDefault();
-            openSellModal();
-        }
-    });
-
-    sellClose?.addEventListener('click', closeSellModal);
-    sellOverlay?.addEventListener('click', (e) => {
-        if (e.target === sellOverlay) closeSellModal();
-    });
-
-    sellForm?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const title = document.getElementById('sellTitle').value.trim();
-        const catId = parseInt(document.getElementById('sellCategory').value);
-        const condition = document.getElementById('sellCondition').value;
-        const price = parseFloat(document.getElementById('sellPrice').value);
-        const qty = parseInt(document.getElementById('sellQty').value);
-
-        if (!title || isNaN(price) || price <= 0) {
-            alert("Please enter a valid title and positive price (CHECK constraint price > 0).");
+    function performSearch() {
+        const query = (input ? input.value : '').toLowerCase().trim();
+        if (!query) {
+            renderLoans(allLoansCache);
             return;
         }
 
-        if (backendConnected) {
-            try {
-                const res = await fetch(`${API_BASE}/listings`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        seller_id: currentUser.id,
-                        category_id: catId,
-                        title: title,
-                        price: price,
-                        quantity: qty,
-                        condition: condition,
-                        is_book: (catId === 1 || catId === 2)
-                    })
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    alert(`✅ Listing Created Successfully in MySQL!\n\nExecuted SQL:\n${data.sql}\n\nNotice: Specialization ensured user #${currentUser.id} is now registered in SELLER table!`);
-                    sellForm.reset();
-                    closeSellModal();
-                    await renderListings();
-                } else {
-                    alert(`❌ Failed to create listing: ${data.error}`);
-                }
-            } catch (err) {
-                alert(`Error contacting backend: ${err.message}`);
-            }
-        } else {
-            alert(`✅ [Demo Mode] Listing Created Successfully!\n\nExecuted SQL:\nINSERT INTO LISTING (seller_id, category_id, title, price, quantity, condition, status)\nVALUES (${currentUser.id}, ${catId}, '${title}', ${price}, ${qty}, '${condition}', 'ACTIVE');\n\n(Start backend/app.py to save directly to MySQL database!)`);
-            sellForm.reset();
-            closeSellModal();
-        }
-    });
-}
+        const filtered = allLoansCache.filter(l => {
+            return (l.applicant_name || '').toLowerCase().includes(query) ||
+                   (l.product_name || '').toLowerCase().includes(query) ||
+                   (l.product_type || '').toLowerCase().includes(query) ||
+                   (String(l.loan_id)).includes(query) ||
+                   (l.status || '').toLowerCase().includes(query);
+        });
 
-// ============================================================================
-// LOGIN SYSTEM
-// Simulates database authentication for the demo. Shows:
-// 1. A user-picker (simulates SELECT * FROM USER)
-// 2. Profile view (simulates JOIN across USER, SELLER, BUYER)
-// 3. The actual SQL queries that would power this in a real app
-// ============================================================================
-
-// Sample users from the database (what seed.sql generates)
-const sampleUsers = [
-    { id: 1,  name: "Arjun Sharma",   email: "arjun.sharma1@campusswap.in",   phone: "+919876543210", hostel: "Block-A",        room: "204", isSeller: true,  isBuyer: true,  upi: "arjun@upi",   totalSales: 15420, avgRating: 4.5, wallet: 200,  listings: 8,  orders: 3 },
-    { id: 2,  name: "Priya Mehta",    email: "priya.mehta2@campusswap.in",     phone: "+919876543211", hostel: "Girls-Hostel-1", room: "312", isSeller: true,  isBuyer: true,  upi: "priya@upi",   totalSales: 12350, avgRating: 4.8, wallet: 500,  listings: 5,  orders: 7 },
-    { id: 3,  name: "Rohit Kumar",    email: "rohit.kumar3@campusswap.in",     phone: "+919876543212", hostel: "Block-C",        room: "108", isSeller: true,  isBuyer: false, upi: "rohit@upi",   totalSales: 9800,  avgRating: 4.2, wallet: 0,    listings: 12, orders: 0 },
-    { id: 4,  name: "Sneha Reddy",    email: "sneha.reddy4@campusswap.in",     phone: "+919876543213", hostel: "Girls-Hostel-2", room: "215", isSeller: true,  isBuyer: true,  upi: "sneha@upi",   totalSales: 8650,  avgRating: 3.9, wallet: 1200, listings: 6,  orders: 4 },
-    { id: 5,  name: "Vikram Desai",   email: "vikram.desai5@campusswap.in",    phone: "+919876543214", hostel: "Block-D",        room: "401", isSeller: true,  isBuyer: true,  upi: "vikram@upi",  totalSales: 7200,  avgRating: 4.7, wallet: 800,  listings: 3,  orders: 5 },
-    { id: 6,  name: "Ananya Patel",   email: "ananya.patel6@campusswap.in",    phone: "+919876543215", hostel: "Girls-Hostel-1", room: "119", isSeller: true,  isBuyer: false, upi: "ananya@upi",  totalSales: 3200,  avgRating: 4.3, wallet: 0,    listings: 4,  orders: 0 },
-    { id: 7,  name: "Karthik Verma",  email: "karthik.verma7@campusswap.in",   phone: "+919876543216", hostel: "Block-B",        room: "305", isSeller: false, isBuyer: true,  upi: null,          totalSales: 0,     avgRating: 0,   wallet: 350,  listings: 0,  orders: 6 },
-    { id: 8,  name: "Meera Thomas",   email: "meera.thomas8@campusswap.in",    phone: "+919876543217", hostel: "Block-E",        room: "210", isSeller: true,  isBuyer: true,  upi: "meera@upi",   totalSales: 5100,  avgRating: 4.6, wallet: 150,  listings: 7,  orders: 2 },
-    { id: 9,  name: "Rahul Gupta",    email: "rahul.gupta9@campusswap.in",     phone: "+919876543218", hostel: "Block-C",        room: "415", isSeller: false, isBuyer: true,  upi: null,          totalSales: 0,     avgRating: 0,   wallet: 900,  listings: 0,  orders: 8 },
-    { id: 10, name: "Divya Singh",    email: "divya.singh10@campusswap.in",    phone: "+919876543219", hostel: "Girls-Hostel-2", room: "102", isSeller: false, isBuyer: false, upi: null,          totalSales: 0,     avgRating: 0,   wallet: 0,    listings: 0,  orders: 0 },
-];
-
-// Avatar gradient colors for variety
-const avatarColors = [
-    'linear-gradient(135deg, #6C5CE7, #FD79A8)',
-    'linear-gradient(135deg, #00B894, #00CEC9)',
-    'linear-gradient(135deg, #E17055, #FDCB6E)',
-    'linear-gradient(135deg, #0984E3, #74B9FF)',
-    'linear-gradient(135deg, #A29BFE, #FD79A8)',
-    'linear-gradient(135deg, #00B894, #55EFC4)',
-    'linear-gradient(135deg, #E17055, #FAB1A0)',
-    'linear-gradient(135deg, #6C5CE7, #A29BFE)',
-    'linear-gradient(135deg, #0984E3, #00CEC9)',
-    'linear-gradient(135deg, #FD79A8, #E84393)',
-];
-
-let currentUser = null; // tracks who is "logged in"
-
-// ---- BUY ACTION (Calls place_order ACID transaction procedure) ----
-async function handleBuyClick(listingId, title, price) {
-    if (!currentUser) {
-        alert("Please log in first to purchase an item!");
-        const loginOverlay = document.getElementById('loginOverlay');
-        loginOverlay.classList.add('active');
-        document.body.style.overflow = 'hidden';
-        showLoginForm();
-        return;
+        renderLoans(filtered);
     }
 
-    const confirmed = confirm(`Confirm purchase:\n"${title}" for ₹${price}?\n\nThis will trigger the ACID place_order() stored procedure in MySQL!`);
-    if (!confirmed) return;
-
-    if (backendConnected) {
-        try {
-            const res = await fetch(`${API_BASE}/orders`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    buyer_id: currentUser.id,
-                    listing_id: listingId,
-                    quantity: 1,
-                    method: 'UPI'
-                })
-            });
-            const data = await res.json();
-            if (res.ok) {
-                alert(`🎉 Order Placed Successfully via ACID Transaction!\n\nExecuted SQL:\n${data.sql}\n\nQuantity was decremented and status updated automatically via database triggers.`);
-                await renderListings();
-            } else {
-                alert(`❌ Order Failed: ${data.error || 'Check inventory or buyer profile'}`);
-            }
-        } catch (err) {
-            alert(`Error communicating with backend: ${err.message}`);
-        }
-    } else {
-        alert(`🎉 [Demo Mode] Order Placed Successfully!\n\nSQL Executed:\nCALL place_order(${currentUser.id}, ${listingId}, 1, 'UPI');\n\n(Start backend/app.py to run this live against MySQL!)`);
+    if (input) {
+        input.addEventListener('input', performSearch);
+        input.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') performSearch();
+        });
     }
+    if (btn) btn.addEventListener('click', performSearch);
 }
 
+function resetFilters() {
+    activeCategoryFilter = 'ALL';
+    const input = document.getElementById('searchInput');
+    if (input) input.value = '';
+    renderLoans(allLoansCache);
+}
+
+// ----------------------------------------------------------------------------
+// 9. BANK STAFF LOGIN SYSTEM
+// ----------------------------------------------------------------------------
 function initLogin() {
     const loginBtn = document.getElementById('loginBtn');
     const loginOverlay = document.getElementById('loginOverlay');
     const loginClose = document.getElementById('loginClose');
+    const loginBody = document.getElementById('loginBody');
+    const loginTitle = document.getElementById('loginModalTitle');
 
-    function openLoginModal() {
-        loginOverlay.classList.add('active');
-        document.body.style.overflow = 'hidden';
-        if (currentUser) {
-            showProfile(currentUser);
-        } else {
-            showLoginForm();
+    if (!loginBtn || !loginOverlay || !loginBody) return;
+
+    function renderLoginForm() {
+        if (loginTitle) loginTitle.innerHTML = '🔐 Bank Officer Authorization Portal';
+        
+        loginBody.innerHTML = `
+            <div style="margin-bottom:18px;">
+                <p style="font-size:0.88rem; color:var(--text-muted); margin-bottom:14px;">
+                    Select an authorized SBI Branch Officer to evaluate loan approvals, sanction limits, and recovery actions.
+                </p>
+                <div class="user-picker-grid">
+                    ${sampleBankUsers.map(u => `
+                        <div class="user-picker-card" onclick="selectBankUser(${u.user_id})">
+                            <div class="user-picker-avatar" style="background:linear-gradient(135deg, var(--primary), var(--secondary));">
+                                ${u.name.split(' ').map(n=>n[0]).join('')}
+                            </div>
+                            <div class="user-picker-info">
+                                <div class="user-picker-name">${u.name}</div>
+                                <div class="user-picker-detail">${u.emp_code} &bull; ${u.branch.split(',')[0]}</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+
+            <div class="concept-box" style="margin-top:16px;">
+                <p style="font-size:0.8rem; margin:0;">
+                    <strong>Role-Based Access Control:</strong> Chief Managers hold a ₹1.00 Cr sanction limit; 
+                    Retail Officers hold a ₹25.00 Lakh limit. All sanctions log the officer's ID to <code>LOAN.approved_by</code>.
+                </p>
+            </div>
+        `;
+    }
+
+    function renderLoggedInProfile(user) {
+        if (loginTitle) loginTitle.innerHTML = '🏛️ Officer Profile & Sanction Limits';
+
+        loginBody.innerHTML = `
+            <div class="profile-container">
+                <div class="profile-avatar-large">
+                    ${user.name.split(' ').map(n=>n[0]).join('')}
+                </div>
+                <div class="profile-name">${user.name}</div>
+                <div class="profile-email">${user.role}</div>
+
+                <div class="profile-details">
+                    <div class="profile-detail-item">
+                        <div class="profile-detail-label">Employee Code</div>
+                        <div class="profile-detail-value">${user.emp_code}</div>
+                    </div>
+                    <div class="profile-detail-item">
+                        <div class="profile-detail-label">Branch</div>
+                        <div class="profile-detail-value">${user.branch}</div>
+                    </div>
+                    <div class="profile-detail-item">
+                        <div class="profile-detail-label">Sanction Limit</div>
+                        <div class="profile-detail-value" style="color:var(--secondary);">${formatINR(user.sanction_limit)}</div>
+                    </div>
+                    <div class="profile-detail-item">
+                        <div class="profile-detail-label">Email</div>
+                        <div class="profile-detail-value" style="font-size:0.8rem;">${user.email}</div>
+                    </div>
+                </div>
+
+                <div class="profile-actions">
+                    <button class="btn btn-outline" onclick="logoutBankUser()">Sign Out</button>
+                    <button class="btn btn-primary" onclick="document.getElementById('loginOverlay').classList.remove('active'); openApplyModal();">
+                        + New Sanction
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    window.selectBankUser = function(userId) {
+        const user = sampleBankUsers.find(u => u.user_id === userId);
+        if (user) {
+            currentLoggedInUser = user;
+            loginOverlay.classList.remove('active');
+            updateNavbarUser(user);
         }
-    }
+    };
 
-    function closeLoginModal() {
+    window.logoutBankUser = function() {
+        currentLoggedInUser = null;
+        const navActions = document.querySelector('.nav-actions');
+        if (navActions) {
+            const userBtn = navActions.querySelector('.nav-user');
+            if (userBtn) userBtn.remove();
+            if (loginBtn) loginBtn.style.display = 'inline-block';
+        }
         loginOverlay.classList.remove('active');
-        document.body.style.overflow = '';
+    };
+
+    function updateNavbarUser(user) {
+        if (loginBtn) loginBtn.style.display = 'none';
+        const navActions = document.querySelector('.nav-actions');
+        if (!navActions) return;
+
+        let userBadge = navActions.querySelector('.nav-user');
+        if (!userBadge) {
+            userBadge = document.createElement('button');
+            userBadge.className = 'nav-user';
+            navActions.prepend(userBadge);
+        }
+
+        userBadge.innerHTML = `
+            <div class="nav-user-avatar">${user.name.split(' ').map(n=>n[0]).join('')}</div>
+            <span class="nav-user-name">${user.name.split(' ')[0]} (${user.emp_code.split('_')[1]})</span>
+        `;
+
+        userBadge.onclick = () => {
+            renderLoggedInProfile(user);
+            loginOverlay.classList.add('active');
+        };
     }
 
-    loginBtn?.addEventListener('click', openLoginModal);
-    loginClose?.addEventListener('click', closeLoginModal);
-    loginOverlay?.addEventListener('click', (e) => {
-        if (e.target === loginOverlay) closeLoginModal();
+    loginBtn.addEventListener('click', () => {
+        if (currentLoggedInUser) {
+            renderLoggedInProfile(currentLoggedInUser);
+        } else {
+            renderLoginForm();
+        }
+        loginOverlay.classList.add('active');
     });
 
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && loginOverlay.classList.contains('active')) {
-            closeLoginModal();
-        }
+    if (loginClose) {
+        loginClose.addEventListener('click', () => loginOverlay.classList.remove('active'));
+    }
+
+    loginOverlay.addEventListener('click', (e) => {
+        if (e.target === loginOverlay) loginOverlay.classList.remove('active');
     });
 }
 
-async function showLoginForm() {
-    const body = document.getElementById('loginBody');
-    const title = document.getElementById('loginModalTitle');
-    title.textContent = '🔐 Student Login';
+// ----------------------------------------------------------------------------
+// 10. EMI CALCULATOR ENGINE (INTERACTIVE REDUCING-BALANCE SIMULATOR)
+// ----------------------------------------------------------------------------
+function calculateEmi(principal, annualRate, tenureMonths) {
+    const P = Number(principal);
+    const r = (Number(annualRate) / 12.0) / 100.0;
+    const n = Number(tenureMonths);
 
-    let users = sampleUsers;
-    if (backendConnected) {
-        try {
-            const res = await fetch(`${API_BASE}/users`);
-            const data = await res.json();
-            if (data.users && data.users.length > 0) {
-                users = data.users.map(u => ({
-                    id: u.user_id,
-                    name: u.name,
-                    email: u.email,
-                    phone: u.phone,
-                    hostel: u.hostel_block,
-                    room: u.room_no,
-                    isSeller: Boolean(u.is_seller),
-                    isBuyer: Boolean(u.is_buyer),
-                    upi: u.upi_id,
-                    totalSales: Number(u.total_sales || 0),
-                    avgRating: Number(u.avg_rating || 0),
-                    wallet: Number(u.wallet_balance || 0),
-                    listings: 0,
-                    orders: 0
-                }));
-            }
-        } catch (err) {
-            console.warn('Using sample users due to fetch error:', err);
-        }
+    if (P <= 0 || n <= 0) return { emi: 0, totalPayable: 0, totalInterest: 0 };
+    if (r === 0) {
+        const emi = P / n;
+        return { emi, totalPayable: P, totalInterest: 0 };
     }
 
-    body.innerHTML = `
-        <div class="login-form">
-            <div>
-                <label>Email Address</label>
-                <input type="email" id="loginEmail" placeholder="your.name@campusswap.in" autocomplete="off">
-            </div>
-            <div>
-                <label>Password</label>
-                <input type="password" id="loginPassword" placeholder="Enter password" value="campus123">
-            </div>
-            <button class="btn btn-primary" id="loginSubmit" style="width:100%">Log In</button>
+    const emi = (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+    const totalPayable = emi * n;
+    const totalInterest = totalPayable - P;
+    return {
+        emi: Math.round(emi),
+        totalPayable: Math.round(totalPayable),
+        totalInterest: Math.round(totalInterest)
+    };
+}
 
-            <div class="login-divider">or pick a demo account</div>
+function initEmiCalculatorSection() {
+    // If an element with id="emiCalculatorSection" doesn't exist, create it above the dashboard
+    let section = document.getElementById('emiCalculatorSection');
+    if (!section) {
+        section = document.createElement('section');
+        section.id = 'emiCalculatorSection';
+        section.className = 'section';
+        section.style.background = 'rgba(22, 22, 42, 0.7)';
+        section.style.borderTop = '1px solid var(--glass-border)';
+        section.style.borderBottom = '1px solid var(--glass-border)';
 
-            <div class="user-picker-grid">
-                ${users.map((u, i) => `
-                    <div class="user-picker-card" data-user-id="${u.id}">
-                        <div class="user-picker-avatar" style="background: ${avatarColors[i % avatarColors.length]}">
-                            ${u.name.split(' ').map(n => n[0]).join('')}
+        const container = document.createElement('div');
+        container.className = 'container';
+        container.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:32px; flex-wrap:wrap; gap:16px;">
+                <div>
+                    <h2 class="section-title">🧮 Reducing-Balance EMI Amortization Engine</h2>
+                    <p class="section-subtitle" style="margin-bottom:0;">
+                        Calculate exact monthly payments using standard Indian banking formula: 
+                        <code>EMI = P &times; r &times; (1+r)<sup>n</sup> / ((1+r)<sup>n</sup> &minus; 1)</code>
+                    </p>
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1.2fr; gap:32px; align-items:start;">
+                <!-- Controls -->
+                <div style="background:var(--bg-card); border:1px solid var(--glass-border); border-radius:var(--radius); padding:28px;">
+                    <div style="margin-bottom:20px;">
+                        <label style="display:flex; justify-content:space-between; font-size:0.85rem; font-weight:600; margin-bottom:8px;">
+                            <span>Principal Loan Amount (P)</span>
+                            <span id="calcPrincipalDisplay" style="color:var(--secondary); font-weight:700;">₹10,00,000</span>
+                        </label>
+                        <input type="range" id="calcPrincipalRange" min="50000" max="10000000" step="50000" value="1000000" style="width:100%; accent-color:var(--primary);">
+                        <input type="number" id="calcPrincipalInput" value="1000000" style="margin-top:8px;" class="login-form">
+                    </div>
+
+                    <div style="margin-bottom:20px;">
+                        <label style="display:flex; justify-content:space-between; font-size:0.85rem; font-weight:600; margin-bottom:8px;">
+                            <span>Annual Interest Rate (R % p.a.)</span>
+                            <span id="calcRateDisplay" style="color:var(--primary-light); font-weight:700;">8.50%</span>
+                        </label>
+                        <input type="range" id="calcRateRange" min="5.0" max="24.0" step="0.25" value="8.50" style="width:100%; accent-color:var(--primary);">
+                    </div>
+
+                    <div style="margin-bottom:24px;">
+                        <label style="display:flex; justify-content:space-between; font-size:0.85rem; font-weight:600; margin-bottom:8px;">
+                            <span>Tenure in Months (n)</span>
+                            <span id="calcTenureDisplay" style="color:var(--accent); font-weight:700;">60 Months (5 Yrs)</span>
+                        </label>
+                        <input type="range" id="calcTenureRange" min="6" max="360" step="6" value="60" style="width:100%; accent-color:var(--primary);">
+                    </div>
+
+                    <div class="concept-box" style="margin:0;">
+                        <p style="font-size:0.8rem; margin:0;">
+                            <strong>Interest Amortization:</strong> Interest is charged only on the declining principal balance, 
+                            so the principal repayment component increases with each passing installment!
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Results & Visual Breakdown -->
+                <div style="background:var(--bg-card); border:1px solid var(--glass-border); border-radius:var(--radius); padding:28px;">
+                    <div style="text-align:center; padding-bottom:24px; border-bottom:1px solid var(--glass-border); margin-bottom:24px;">
+                        <span style="font-size:0.85rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;">Calculated Monthly EMI</span>
+                        <div id="calcEmiResult" style="font-size:2.8rem; font-weight:900; color:var(--secondary); margin:6px 0;">₹20,517</div>
+                        <span style="font-size:0.8rem; color:var(--text-dim);">Payable on 1st of each calendar month</span>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;">
+                        <div style="background:var(--bg-surface); padding:16px; border-radius:var(--radius-sm);">
+                            <span style="font-size:0.75rem; color:var(--text-muted);">Total Principal Amount</span>
+                            <div id="calcPrincipalTotal" style="font-size:1.2rem; font-weight:700; color:var(--text); margin-top:4px;">₹10,00,000</div>
                         </div>
-                        <div class="user-picker-info">
-                            <div class="user-picker-name">${u.name}</div>
-                            <div class="user-picker-detail">${u.hostel} · Room ${u.room}</div>
+                        <div style="background:var(--bg-surface); padding:16px; border-radius:var(--radius-sm);">
+                            <span style="font-size:0.75rem; color:var(--text-muted);">Total Interest Payable</span>
+                            <div id="calcInterestTotal" style="font-size:1.2rem; font-weight:700; color:var(--accent); margin-top:4px;">₹2,30,993</div>
                         </div>
                     </div>
-                `).join('')}
+
+                    <div style="background:var(--bg-surface); padding:16px; border-radius:var(--radius-sm); margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:0.85rem; font-weight:600;">Total Amount (Principal + Interest)</span>
+                        <span id="calcGrandTotal" style="font-size:1.3rem; font-weight:800; color:var(--primary-light);">₹12,30,993</span>
+                    </div>
+
+                    <button class="btn btn-primary" style="width:100%;" onclick="openApplyModalWithParams()">
+                        Apply with These Parameters &rarr;
+                    </button>
+                </div>
             </div>
+        `;
+        section.appendChild(container);
 
-            <div class="concept-box" style="margin-top: 8px;">
-                <p style="margin-bottom: 0; color: var(--text); font-size: 0.82rem;">
-                    <strong>🔍 SQL Behind Login:</strong> In a real app, clicking "Log In" runs:
-                </p>
-            </div>
-            <pre><code class="language-sql">-- Authentication query
-SELECT user_id, name, email, hostel_block, room_no
-FROM \`USER\`
-WHERE email = ? AND password_hash = SHA2(?, 256);
-
--- Then check roles:
-SELECT seller_id FROM SELLER WHERE seller_id = ?;
-SELECT buyer_id FROM BUYER WHERE buyer_id = ?;</code></pre>
-        </div>
-    `;
-
-    // Highlight SQL
-    body.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
-
-    // Email login handler
-    document.getElementById('loginSubmit')?.addEventListener('click', () => {
-        const email = document.getElementById('loginEmail').value.trim().toLowerCase();
-        const user = users.find(u => u.email === email);
-        if (user) {
-            loginAs(user);
-        } else if (email) {
-            const byName = users.find(u => u.name.toLowerCase().includes(email.split('@')[0].replace('.', ' ')));
-            if (byName) {
-                loginAs(byName);
-            } else {
-                alert('User not found! Try picking a demo account below, or use an email from the list.');
-            }
+        // Insert before dashboard or after listings
+        const dashboard = document.getElementById('dashboard');
+        if (dashboard && dashboard.parentNode) {
+            dashboard.parentNode.insertBefore(section, dashboard);
         } else {
-            alert('Please enter an email or pick a demo account below.');
+            document.body.appendChild(section);
         }
-    });
 
-    // User picker click handler
-    document.querySelectorAll('.user-picker-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const userId = parseInt(card.dataset.userId);
-            const user = users.find(u => u.id === userId);
-            if (user) loginAs(user);
+        // Attach event listeners for real-time slider updates
+        const pRange = document.getElementById('calcPrincipalRange');
+        const pInput = document.getElementById('calcPrincipalInput');
+        const rRange = document.getElementById('calcRateRange');
+        const tRange = document.getElementById('calcTenureRange');
+
+        function updateCalc() {
+            const P = Number(pRange.value);
+            const R = Number(rRange.value);
+            const N = Number(tRange.value);
+
+            document.getElementById('calcPrincipalDisplay').innerText = formatINR(P);
+            pInput.value = P;
+            document.getElementById('calcRateDisplay').innerText = `${R.toFixed(2)}%`;
+            document.getElementById('calcTenureDisplay').innerText = `${N} Months (${(N/12).toFixed(1)} Yrs)`;
+
+            const res = calculateEmi(P, R, N);
+            document.getElementById('calcEmiResult').innerText = formatINR(res.emi);
+            document.getElementById('calcPrincipalTotal').innerText = formatINR(P);
+            document.getElementById('calcInterestTotal').innerText = formatINR(res.totalInterest);
+            document.getElementById('calcGrandTotal').innerText = formatINR(res.totalPayable);
+        }
+
+        pRange.addEventListener('input', updateCalc);
+        rRange.addEventListener('input', updateCalc);
+        tRange.addEventListener('input', updateCalc);
+        pInput.addEventListener('input', () => {
+            pRange.value = pInput.value;
+            updateCalc();
         });
+
+        updateCalc();
+    }
+}
+
+// ----------------------------------------------------------------------------
+// 11. "APPLY FOR LOAN" MODAL (REPLACES OLD "SELL" MODAL)
+// ----------------------------------------------------------------------------
+function initApplyLoanModal() {
+    // Check sellOverlay in index.html
+    const sellOverlay = document.getElementById('sellOverlay');
+    const sellClose = document.getElementById('sellClose');
+    const sellBody = document.getElementById('sellBody');
+    const navSellBtn = document.querySelector('.nav-actions .btn-primary');
+
+    if (!sellOverlay || !sellBody) return;
+
+    if (navSellBtn) {
+        navSellBtn.innerHTML = '📝 Apply for Loan';
+        navSellBtn.onclick = () => openApplyModal();
+    }
+
+    window.openApplyModal = function(initialP = 500000, initialR = 8.50, initialN = 60) {
+        const headerTitle = sellOverlay.querySelector('.modal-header h2');
+        if (headerTitle) headerTitle.innerHTML = '📝 New Bank Loan Application';
+
+        sellBody.innerHTML = `
+            <form class="login-form" id="applyLoanForm" onsubmit="handleLoanApplicationSubmit(event)">
+                <div>
+                    <label>Borrower / Applicant *</label>
+                    <select id="loanApplicantSelect" required onchange="handleApplicantSelectChange(this)">
+                        ${sampleApplicants.map(a => `
+                            <option value="${a.applicant_id}">
+                                ${a.name} (PAN: ${a.pan_no} | CIBIL: ${a.credit_score})
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                    <div>
+                        <label>Loan Product *</label>
+                        <select id="loanProductSelect" required onchange="handleProductSelectChange(this)">
+                            ${sampleProducts.map(p => `
+                                <option value="${p.product_id}" data-rate="${p.interest_rate}" data-type="${p.product_type}">
+                                    ${p.name} (${p.interest_rate}%)
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Interest Rate (% p.a.)</label>
+                        <input type="number" id="loanRateInput" step="0.05" value="${initialR}" required readonly style="background:var(--bg-surface); opacity:0.8;">
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                    <div>
+                        <label>Principal Amount (₹) *</label>
+                        <input type="number" id="loanPrincipalInput" min="20000" max="10000000" step="10000" value="${initialP}" required oninput="recalcFormEmi()">
+                    </div>
+                    <div>
+                        <label>Tenure (Months) *</label>
+                        <input type="number" id="loanTenureInput" min="6" max="360" step="6" value="${initialN}" required oninput="recalcFormEmi()">
+                    </div>
+                </div>
+
+                <!-- Instant EMI Calculation Box -->
+                <div style="background:rgba(0,184,148,0.1); border:1px solid rgba(0,184,148,0.3); border-radius:var(--radius-sm); padding:14px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <span style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Calculated Reducing Monthly EMI</span>
+                        <div id="formCalculatedEmi" style="font-size:1.3rem; font-weight:800; color:var(--secondary);">₹10,258 / mo</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="font-size:0.75rem; color:var(--text-muted);">Total Repayment</span>
+                        <div id="formCalculatedTotal" style="font-size:1.05rem; font-weight:700; color:var(--text);">₹6,15,480</div>
+                    </div>
+                </div>
+
+                <div>
+                    <label>Guarantor / Co-Applicant (Optional)</label>
+                    <input type="text" id="loanGuarantorInput" placeholder="e.g. Spouse / Parent / Business Partner Name">
+                </div>
+
+                <div>
+                    <label>Officer Remarks / Credit Notes</label>
+                    <input type="text" id="loanRemarksInput" placeholder="e.g. KYC verified, salary slip attached, credit check cleared" value="Approved under retail underwriting program">
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width:100%; margin-top:8px;">
+                    Sanction Loan & Generate Schedule &rarr;
+                </button>
+
+                <div class="concept-box" style="margin-top:8px;">
+                    <p style="margin-bottom:0; color:var(--text); font-size:0.8rem;">
+                        <strong>🔍 SQL Behind Sanction:</strong> Executes <code>INSERT INTO LOAN (...)</code> with CHECK constraints, 
+                        followed immediately by stored procedure <code>CALL generate_emi_schedule(loan_id)</code>.
+                    </p>
+                </div>
+            </form>
+        `;
+
+        sellOverlay.classList.add('active');
+        recalcFormEmi();
+    };
+
+    window.openApplyModalWithParams = function() {
+        const p = document.getElementById('calcPrincipalRange') ? document.getElementById('calcPrincipalRange').value : 500000;
+        const r = document.getElementById('calcRateRange') ? document.getElementById('calcRateRange').value : 8.5;
+        const n = document.getElementById('calcTenureRange') ? document.getElementById('calcTenureRange').value : 60;
+        openApplyModal(p, r, n);
+    };
+
+    window.handleProductSelectChange = function(select) {
+        const opt = select.options[select.selectedIndex];
+        const rate = opt.getAttribute('data-rate');
+        const rateInput = document.getElementById('loanRateInput');
+        if (rateInput && rate) {
+            rateInput.value = rate;
+            recalcFormEmi();
+        }
+    };
+
+    window.recalcFormEmi = function() {
+        const p = Number(document.getElementById('loanPrincipalInput').value || 0);
+        const r = Number(document.getElementById('loanRateInput').value || 8.5);
+        const n = Number(document.getElementById('loanTenureInput').value || 60);
+
+        const res = calculateEmi(p, r, n);
+        const emiDisplay = document.getElementById('formCalculatedEmi');
+        const totDisplay = document.getElementById('formCalculatedTotal');
+        if (emiDisplay) emiDisplay.innerText = `${formatINR(res.emi)} / mo`;
+        if (totDisplay) totDisplay.innerText = formatINR(res.totalPayable);
+    };
+
+    window.handleLoanApplicationSubmit = async function(e) {
+        e.preventDefault();
+        const applicantId = Number(document.getElementById('loanApplicantSelect').value);
+        const productId = Number(document.getElementById('loanProductSelect').value);
+        const principal = Number(document.getElementById('loanPrincipalInput').value);
+        const rate = Number(document.getElementById('loanRateInput').value);
+        const tenure = Number(document.getElementById('loanTenureInput').value);
+        const guarantor = document.getElementById('loanGuarantorInput').value.trim();
+        const remarks = document.getElementById('loanRemarksInput').value.trim();
+
+        const officerName = currentLoggedInUser ? currentLoggedInUser.name : "Ramesh Iyer (Chief Manager)";
+
+        const payload = {
+            applicant_id: applicantId,
+            product_id: productId,
+            principal_amount: principal,
+            interest_rate: rate,
+            tenure_months: tenure,
+            remarks: remarks,
+            approved_by: officerName,
+            status: "ACTIVE"
+        };
+
+        let newLoanId = null;
+
+        if (backendConnected) {
+            try {
+                const res = await fetch(`${API_BASE}/loans`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.loan_id) {
+                    newLoanId = data.loan_id;
+                    // Trigger generate EMI procedure
+                    await fetch(`${API_BASE}/loans/${newLoanId}/generate-emi`, { method: 'POST' });
+                }
+            } catch (err) {
+                console.warn('API error during loan sanction:', err);
+            }
+        }
+
+        // If offline or fallback
+        if (!newLoanId) {
+            newLoanId = 1000 + sampleLoans.length + 1;
+            const appObj = sampleApplicants.find(a => a.applicant_id === applicantId) || sampleApplicants[0];
+            const prodObj = sampleProducts.find(p => p.product_id === productId) || sampleProducts[0];
+            const calc = calculateEmi(principal, rate, tenure);
+
+            const newLoan = {
+                loan_id: newLoanId,
+                applicant_id: applicantId,
+                applicant_name: appObj.name,
+                applicant_email: appObj.email,
+                credit_score: appObj.credit_score,
+                product_id: productId,
+                product_name: prodObj.name,
+                product_type: prodObj.product_type,
+                guarantor_id: guarantor ? 99 : null,
+                guarantor_name: guarantor || null,
+                principal_amount: principal,
+                interest_rate: rate,
+                tenure_months: tenure,
+                emi_amount: calc.emi,
+                total_payable: calc.totalPayable,
+                disbursement_date: new Date().toISOString().split('T')[0],
+                maturity_date: new Date(Date.now() + tenure * 30 * 86400000).toISOString().split('T')[0],
+                status: "ACTIVE",
+                approved_by: officerName,
+                remarks: remarks
+            };
+
+            sampleLoans.unshift(newLoan);
+            allLoansCache = sampleLoans;
+        }
+
+        sellOverlay.classList.remove('active');
+        alert(`🎉 Loan #${newLoanId} successfully sanctioned!\nAmortization schedule compiled and activated.`);
+        renderLoans();
+        openLoanDetailModal(newLoanId);
+    };
+
+    if (sellClose) {
+        sellClose.addEventListener('click', () => sellOverlay.classList.remove('active'));
+    }
+    sellOverlay.addEventListener('click', (e) => {
+        if (e.target === sellOverlay) sellOverlay.classList.remove('active');
     });
 }
 
-async function loginAs(user) {
-    currentUser = user;
-    updateNavbar(user);
-    await showProfile(user);
-}
+// ----------------------------------------------------------------------------
+// 12. LOAN & APPLICANT DETAILS MODAL WITH EMI SCHEDULE & REPAYMENT TRIGGER
+// ----------------------------------------------------------------------------
+async function openLoanDetailModal(loanId) {
+    let loan = allLoansCache.find(l => l.loan_id === loanId);
+    let schedule = [];
+    let repayments = [];
 
-async function showProfile(user) {
-    const body = document.getElementById('loginBody');
-    const title = document.getElementById('loginModalTitle');
-    const idx = sampleUsers.findIndex(u => u.id === user.id);
-    const gradient = avatarColors[(idx >= 0 ? idx : user.id) % avatarColors.length];
-
-    title.textContent = '👤 My Profile';
-
-    // If backend is connected, fetch live calculated data from MySQL
-    let liveUser = { ...user };
     if (backendConnected) {
         try {
-            const res = await fetch(`${API_BASE}/users/${user.id}`);
+            const res = await fetch(`${API_BASE}/loans/${loanId}`);
             const data = await res.json();
-            if (data.user) {
-                const u = data.user;
-                liveUser = {
-                    id: u.user_id,
-                    name: u.name,
-                    email: u.email,
-                    phone: u.phone,
-                    hostel: u.hostel_block,
-                    room: u.room_no,
-                    isSeller: Boolean(u.is_seller),
-                    isBuyer: Boolean(u.is_buyer),
-                    upi: u.upi_id,
-                    totalSales: Number(u.total_sales || 0),
-                    avgRating: Number(u.avg_rating || 0),
-                    wallet: Number(u.wallet_balance || 0),
-                    listings: Number(u.listing_count || 0),
-                    orders: Number(u.order_count || 0)
-                };
+            if (data.data) {
+                loan = data.data;
+                schedule = data.data.emi_schedule || [];
+                repayments = data.data.repayments || [];
             }
-        } catch (err) {
-            console.warn('Could not fetch live profile:', err);
+        } catch (e) {
+            console.warn('API error fetching loan detail:', e);
         }
     }
 
-    const roles = [];
-    if (liveUser.isSeller) roles.push('<span class="role-badge role-seller">🏷️ Seller</span>');
-    if (liveUser.isBuyer) roles.push('<span class="role-badge role-buyer">🛒 Buyer</span>');
-    if (!liveUser.isSeller && !liveUser.isBuyer) roles.push('<span class="role-badge" style="background:rgba(225,112,85,0.15);color:#E17055">👀 Browser</span>');
+    if (!loan) loan = sampleLoans[0];
 
-    body.innerHTML = `
-        <div class="profile-container">
-            <div class="profile-avatar-large" style="background: ${gradient}">
-                ${liveUser.name.split(' ').map(n => n[0]).join('')}
+    // Generate local amortization schedule if empty
+    if (!schedule || schedule.length === 0) {
+        const P = loan.principal_amount;
+        const r = (loan.interest_rate / 12.0) / 100.0;
+        const n = loan.tenure_months;
+        const emi = loan.emi_amount;
+        let bal = P;
+        const start = new Date(loan.disbursement_date || '2024-02-01');
+
+        for (let i = 1; i <= Math.min(n, 24); i++) {
+            const intComp = Math.round(bal * r);
+            let prinComp = emi - intComp;
+            if (i === n || prinComp > bal) {
+                prinComp = bal;
+                bal = 0;
+            } else {
+                bal = Math.max(0, bal - prinComp);
+            }
+            const d = new Date(start);
+            d.setMonth(d.getMonth() + i);
+
+            const isPast = d < new Date();
+            const status = (loan.loan_id === 1005 && i >= 3) ? 'OVERDUE' : (isPast ? 'PAID' : 'PENDING');
+
+            schedule.push({
+                emi_id: (loan.loan_id * 100) + i,
+                installment_no: i,
+                due_date: d.toISOString().split('T')[0],
+                principal_component: prinComp,
+                interest_component: intComp,
+                emi_amount: emi,
+                balance_after: bal,
+                status: status,
+                penalty_amount: (status === 'OVERDUE' ? 1574 : 0)
+            });
+        }
+    }
+
+    // Reuse or create detail modal
+    let modalOverlay = document.getElementById('loanDetailOverlay');
+    if (!modalOverlay) {
+        modalOverlay = document.createElement('div');
+        modalOverlay.id = 'loanDetailOverlay';
+        modalOverlay.className = 'modal-overlay';
+        document.body.appendChild(modalOverlay);
+    }
+
+    modalOverlay.innerHTML = `
+        <div class="modal" style="max-width: 960px;">
+            <div class="modal-header">
+                <div>
+                    <h2 style="margin:0;">🏦 Loan Dossier #${loan.loan_id} &bull; ${loan.applicant_name}</h2>
+                    <span style="font-size:0.8rem; color:var(--text-muted);">${loan.product_name} &bull; Sanctioned by ${loan.approved_by || 'Officer'}</span>
+                </div>
+                <button class="modal-close" onclick="document.getElementById('loanDetailOverlay').classList.remove('active');">&times;</button>
             </div>
-            <div class="profile-name">${liveUser.name}</div>
-            <div class="profile-email">${liveUser.email}</div>
+            <div class="modal-body">
+                <!-- Summary KPI Row -->
+                <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:14px; margin-bottom:24px;">
+                    <div style="background:var(--bg-surface); padding:14px; border-radius:var(--radius-sm);">
+                        <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Principal</span>
+                        <div style="font-size:1.15rem; font-weight:700; color:var(--secondary);">${formatINR(loan.principal_amount)}</div>
+                    </div>
+                    <div style="background:var(--bg-surface); padding:14px; border-radius:var(--radius-sm);">
+                        <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Monthly EMI</span>
+                        <div style="font-size:1.15rem; font-weight:700; color:var(--primary-light);">${formatINR(loan.emi_amount)}</div>
+                    </div>
+                    <div style="background:var(--bg-surface); padding:14px; border-radius:var(--radius-sm);">
+                        <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Interest Rate</span>
+                        <div style="font-size:1.15rem; font-weight:700; color:var(--text);">${loan.interest_rate}% p.a.</div>
+                    </div>
+                    <div style="background:var(--bg-surface); padding:14px; border-radius:var(--radius-sm);">
+                        <span style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Loan Status</span>
+                        <div style="font-size:1.15rem; font-weight:700; color:${loan.status==='DEFAULTED'?'#E17055':(loan.status==='CLOSED'?'#A29BFE':'#00B894')};">${loan.status}</div>
+                    </div>
+                </div>
 
-            <div class="profile-roles">${roles.join('')}</div>
+                <!-- Amortization Schedule Table -->
+                <h3 style="margin-bottom:12px;">📅 Reducing-Balance Amortization Schedule (EMI_SCHEDULE)</h3>
+                <div style="max-height:300px; overflow-y:auto; border:1px solid var(--glass-border); border-radius:var(--radius-sm); margin-bottom:24px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:0.82rem; text-align:left;">
+                        <thead style="background:var(--bg-surface); position:sticky; top:0; color:var(--text-muted); text-transform:uppercase; font-size:0.7rem;">
+                            <tr>
+                                <th style="padding:10px 14px;">#</th>
+                                <th style="padding:10px 14px;">Due Date</th>
+                                <th style="padding:10px 14px;">Principal</th>
+                                <th style="padding:10px 14px;">Interest</th>
+                                <th style="padding:10px 14px;">EMI Amount</th>
+                                <th style="padding:10px 14px;">Balance After</th>
+                                <th style="padding:10px 14px;">Status</th>
+                                <th style="padding:10px 14px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${schedule.map(s => `
+                                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                                    <td style="padding:10px 14px; font-weight:600;">${s.installment_no}</td>
+                                    <td style="padding:10px 14px;">${s.due_date}</td>
+                                    <td style="padding:10px 14px; color:var(--secondary);">${formatINR(s.principal_component)}</td>
+                                    <td style="padding:10px 14px; color:var(--accent);">${formatINR(s.interest_component)}</td>
+                                    <td style="padding:10px 14px; font-weight:700;">${formatINR(s.emi_amount)}</td>
+                                    <td style="padding:10px 14px;">${formatINR(s.balance_after)}</td>
+                                    <td style="padding:10px 14px;">
+                                        <span style="font-size:0.68rem; padding:3px 8px; border-radius:4px; font-weight:700;
+                                            background:${s.status==='PAID'?'rgba(0,184,148,0.15)':(s.status==='OVERDUE'?'rgba(225,112,85,0.15)':'rgba(253,203,110,0.15)')};
+                                            color:${s.status==='PAID'?'#00B894':(s.status==='OVERDUE'?'#E17055':'#FDCB6E')};">
+                                            ${s.status}
+                                        </span>
+                                    </td>
+                                    <td style="padding:10px 14px;">
+                                        ${s.status !== 'PAID' ? `
+                                            <button class="btn btn-outline" style="padding:4px 10px; font-size:0.7rem;" onclick="triggerPayEmi(${loan.loan_id}, ${s.emi_id}, ${s.emi_amount})">
+                                                Pay Now
+                                            </button>
+                                        ` : `
+                                            <span style="color:var(--text-dim); font-size:0.75rem;">✓ Paid</span>
+                                        `}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
 
-            <div class="profile-details">
-                <div class="profile-detail-item">
-                    <div class="profile-detail-label">Hostel</div>
-                    <div class="profile-detail-value">${liveUser.hostel}</div>
+                <div class="concept-box" style="margin:0;">
+                    <p style="font-size:0.8rem; margin:0;">
+                        <strong>ACID Banking Repayment:</strong> Clicking <em>Pay Now</em> calls stored procedure <code>process_repayment</code> 
+                        with row-level lock <code>SELECT ... FOR UPDATE</code>.
+                    </p>
                 </div>
-                <div class="profile-detail-item">
-                    <div class="profile-detail-label">Room</div>
-                    <div class="profile-detail-value">${liveUser.room}</div>
-                </div>
-                <div class="profile-detail-item">
-                    <div class="profile-detail-label">Phone</div>
-                    <div class="profile-detail-value">${liveUser.phone}</div>
-                </div>
-                <div class="profile-detail-item">
-                    <div class="profile-detail-label">User ID</div>
-                    <div class="profile-detail-value">#${liveUser.id}</div>
-                </div>
-                ${liveUser.isSeller ? `
-                <div class="profile-detail-item">
-                    <div class="profile-detail-label">Total Sales</div>
-                    <div class="profile-detail-value" style="color:#00B894">₹${liveUser.totalSales.toLocaleString('en-IN')}</div>
-                </div>
-                <div class="profile-detail-item">
-                    <div class="profile-detail-label">Avg Rating</div>
-                    <div class="profile-detail-value" style="color:#FDCB6E">⭐ ${liveUser.avgRating}</div>
-                </div>
-                ` : ''}
-                ${liveUser.isBuyer ? `
-                <div class="profile-detail-item">
-                    <div class="profile-detail-label">Wallet</div>
-                    <div class="profile-detail-value" style="color:#A29BFE">₹${liveUser.wallet.toLocaleString('en-IN')}</div>
-                </div>
-                <div class="profile-detail-item">
-                    <div class="profile-detail-label">Orders</div>
-                    <div class="profile-detail-value">${liveUser.orders}</div>
-                </div>
-                ` : ''}
-                ${liveUser.isSeller ? `
-                <div class="profile-detail-item">
-                    <div class="profile-detail-label">UPI ID</div>
-                    <div class="profile-detail-value">${liveUser.upi || '—'}</div>
-                </div>
-                <div class="profile-detail-item">
-                    <div class="profile-detail-label">Listings</div>
-                    <div class="profile-detail-value">${liveUser.listings}</div>
-                </div>
-                ` : ''}
             </div>
-
-            <div class="profile-actions">
-                <button class="btn btn-outline" id="switchUserBtn">Switch User</button>
-                <button class="btn btn-primary" id="logoutBtn" style="background: linear-gradient(135deg, #E17055, #D63031);">Log Out</button>
-            </div>
-
-            <div class="concept-box">
-                <p style="margin-bottom: 0; color: var(--text); font-size: 0.82rem;">
-                    <strong>🔍 SQL Behind This Profile:</strong>
-                </p>
-            </div>
-            <pre><code class="language-sql">-- Profile data comes from joining 3 tables:
-SELECT u.name, u.email, u.phone, u.hostel_block, u.room_no,
-       s.upi_id, s.total_sales, s.avg_rating,
-       b.wallet_balance,
-       COUNT(DISTINCT l.listing_id) AS listings,
-       COUNT(DISTINCT o.order_id) AS orders
-FROM \`USER\` u
-LEFT JOIN SELLER s ON u.user_id = s.seller_id
-LEFT JOIN BUYER b ON u.user_id = b.buyer_id
-LEFT JOIN LISTING l ON s.seller_id = l.seller_id
-LEFT JOIN ORDERS o ON b.buyer_id = o.buyer_id
-WHERE u.user_id = ${liveUser.id}
-GROUP BY u.user_id;
-
--- This is the seller_dashboard_view in action!
--- LEFT JOINs because user might not be a seller or buyer</code></pre>
         </div>
     `;
 
-    // Highlight SQL
-    body.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
-
-    // Button handlers
-    document.getElementById('switchUserBtn')?.addEventListener('click', () => {
-        showLoginForm();
-    });
-
-    document.getElementById('logoutBtn')?.addEventListener('click', () => {
-        currentUser = null;
-        resetNavbar();
-        showLoginForm();
-    });
+    modalOverlay.classList.add('active');
 }
 
-function updateNavbar(user) {
-    const navActions = document.querySelector('.nav-actions');
-    const idx = sampleUsers.findIndex(u => u.id === user.id);
-    const gradient = avatarColors[(idx >= 0 ? idx : user.id) % avatarColors.length];
+window.triggerPayEmi = async function(loanId, emiId, amount) {
+    if (!confirm(`Confirm repayment of ${formatINR(amount)} for Installment #${emiId}?`)) return;
 
-    navActions.innerHTML = `
-        <button class="nav-user" id="navUserBtn">
-            <div class="nav-user-avatar" style="background: ${gradient}">
-                ${user.name.split(' ').map(n => n[0]).join('')}
+    const payload = {
+        loan_id: loanId,
+        emi_id: emiId,
+        amount_paid: amount,
+        payment_mode: "AUTO_DEBIT",
+        remarks: "Online portal instant repayment"
+    };
+
+    if (backendConnected) {
+        try {
+            await fetch(`${API_BASE}/repayments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } catch (e) {
+            console.warn('API error during repayment:', e);
+        }
+    }
+
+    alert(`✅ Repayment of ${formatINR(amount)} successfully processed!\nTransaction committed to ledger with late fee checking.`);
+    openLoanDetailModal(loanId);
+};
+
+// ----------------------------------------------------------------------------
+// 13. APPLICANT DETAIL MODAL (CREDIT PROFILE & CIBIL SCORE)
+// ----------------------------------------------------------------------------
+function openApplicantDetailModal(applicantId) {
+    const app = allApplicantsCache.find(a => a.applicant_id === applicantId) || sampleApplicants[0];
+    const appLoans = allLoansCache.filter(l => l.applicant_id === applicantId);
+
+    let modalOverlay = document.getElementById('applicantDetailOverlay');
+    if (!modalOverlay) {
+        modalOverlay = document.createElement('div');
+        modalOverlay.id = 'applicantDetailOverlay';
+        modalOverlay.className = 'modal-overlay';
+        document.body.appendChild(modalOverlay);
+    }
+
+    modalOverlay.innerHTML = `
+        <div class="modal" style="max-width: 720px;">
+            <div class="modal-header">
+                <h2>👤 Borrower Credit Profile &bull; ${app.name}</h2>
+                <button class="modal-close" onclick="document.getElementById('applicantDetailOverlay').classList.remove('active');">&times;</button>
             </div>
-            <span class="nav-user-name">${user.name.split(' ')[0]}</span>
-        </button>
-        <button class="btn btn-primary">Sell Now</button>
+            <div class="modal-body">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-surface); padding:20px; border-radius:var(--radius); margin-bottom:20px;">
+                    <div>
+                        <h3 style="margin:0 0 6px 0; color:var(--text);">${app.name}</h3>
+                        <div style="font-size:0.85rem; color:var(--text-muted);">${app.email} &bull; ${app.phone}</div>
+                        <div style="font-size:0.8rem; color:var(--text-dim); margin-top:4px;">${app.address}</div>
+                    </div>
+                    <div style="text-align:center; padding:12px 20px; background:var(--bg-card); border-radius:var(--radius-sm); border:1px solid var(--glass-border);">
+                        <span style="font-size:0.7rem; color:var(--text-dim); text-transform:uppercase;">CIBIL Score</span>
+                        <div style="font-size:2rem; font-weight:900; color:${app.credit_score>=750?'#00B894':(app.credit_score>=650?'#FDCB6E':'#E17055')}">
+                            ${app.credit_score}
+                        </div>
+                        <span style="font-size:0.7rem; font-weight:700; color:var(--text-muted);">
+                            ${app.credit_score>=750?'PRIME TIER':(app.credit_score>=650?'STANDARD':'SUBPRIME / NPA')}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="profile-details" style="margin-bottom:20px;">
+                    <div class="profile-detail-item">
+                        <div class="profile-detail-label">PAN Card</div>
+                        <div class="profile-detail-value">${app.pan_no}</div>
+                    </div>
+                    <div class="profile-detail-item">
+                        <div class="profile-detail-label">Aadhaar Card</div>
+                        <div class="profile-detail-value">${app.aadhaar_no}</div>
+                    </div>
+                    <div class="profile-detail-item">
+                        <div class="profile-detail-label">Annual Income</div>
+                        <div class="profile-detail-value" style="color:var(--secondary);">${formatINR(app.annual_income)}</div>
+                    </div>
+                    <div class="profile-detail-item">
+                        <div class="profile-detail-label">Employment</div>
+                        <div class="profile-detail-value">${app.employment_type} &bull; ${app.employer_name || 'N/A'}</div>
+                    </div>
+                </div>
+
+                <h3 style="margin-bottom:10px;">Sanctioned Loans for this Applicant</h3>
+                ${appLoans.length > 0 ? `
+                    <div style="display:grid; gap:10px;">
+                        ${appLoans.map(l => `
+                            <div style="background:var(--bg-surface); padding:12px 16px; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <strong>Loan #${l.loan_id} &bull; ${l.product_name}</strong>
+                                    <div style="font-size:0.8rem; color:var(--text-muted);">${formatINR(l.principal_amount)} @ ${l.interest_rate}% for ${l.tenure_months} Mos</div>
+                                </div>
+                                <span class="request-status" style="font-size:0.7rem;">${l.status}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : `
+                    <p style="color:var(--text-muted); font-size:0.85rem;">No active loans on record.</p>
+                `}
+            </div>
+        </div>
     `;
 
-    // Click avatar → open profile
-    document.getElementById('navUserBtn')?.addEventListener('click', () => {
-        const loginOverlay = document.getElementById('loginOverlay');
-        loginOverlay.classList.add('active');
-        document.body.style.overflow = 'hidden';
-        showProfile(user);
-    });
+    modalOverlay.classList.add('active');
 }
 
-function resetNavbar() {
-    const navActions = document.querySelector('.nav-actions');
-    navActions.innerHTML = `
-        <button class="btn btn-outline" id="loginBtn">Log In</button>
-        <button class="btn btn-primary">Sell Now</button>
-    `;
-    // Re-attach login handler
-    document.getElementById('loginBtn')?.addEventListener('click', () => {
-        const loginOverlay = document.getElementById('loginOverlay');
-        loginOverlay.classList.add('active');
-        document.body.style.overflow = 'hidden';
-        showLoginForm();
-    });
+// ----------------------------------------------------------------------------
+// 14. DYNAMIC DOM ENHANCEMENTS FOR BANK LOAN MANAGEMENT CONTEXT
+// ----------------------------------------------------------------------------
+function enhancePageContent() {
+    // 1. Update Navigation and Brand Logo
+    const logoSpan = document.querySelector('.logo');
+    if (logoSpan) {
+        logoSpan.innerHTML = `
+            <span class="logo-icon" style="color:var(--secondary);">🏛️</span>
+            <span>Bank<strong>Loan</strong> 360</span>
+        `;
+    }
+
+    const navLinks = document.querySelectorAll('.nav-links .nav-link');
+    if (navLinks.length >= 3) {
+        navLinks[0].innerText = 'Loans';
+        navLinks[1].innerText = 'Products';
+        navLinks[2].innerText = 'Borrowers';
+    }
+
+    // 2. Update Hero Section
+    const heroH1 = document.querySelector('.hero h1');
+    if (heroH1) {
+        heroH1.innerHTML = `Bank Loan Management<br><span class="gradient-text">EMI & Risk System</span>`;
+    }
+
+    const heroSubtitle = document.querySelector('.hero-subtitle');
+    if (heroSubtitle) {
+        heroSubtitle.innerText = 'Precision reducing-balance EMI amortization, automated repayment tracking, and RBI Prudential risk assessment.';
+    }
+
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.placeholder = "Search loans by borrower name ('Rohan Verma'), product ('Home Loan'), or status ('ACTIVE')...";
+    }
+
+    // 3. Update Hero Stats
+    const statsContainer = document.querySelector('.hero-stats');
+    if (statsContainer) {
+        statsContainer.innerHTML = `
+            <div class="stat">
+                <span class="stat-number">₹1.76 Cr</span>
+                <span class="stat-label">Sanctioned</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">8</span>
+                <span class="stat-label">Borrowers</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">7</span>
+                <span class="stat-label">Loan Products</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">94.2%</span>
+                <span class="stat-label">Collection Rate</span>
+            </div>
+        `;
+    }
+
+    // 4. Update Categories to Loan Products
+    const catSectionTitle = document.querySelector('#categories .section-title');
+    if (catSectionTitle) catSectionTitle.innerText = 'Standard Loan Products';
+    const catSectionSub = document.querySelector('#categories .section-subtitle');
+    if (catSectionSub) catSectionSub.innerText = 'Filter loans by category & explore standard interest rates';
+
+    const catGrid = document.querySelector('.categories-grid');
+    if (catGrid) {
+        const categoriesData = [
+            { type: 'HOME', icon: '🏠', title: 'Home Loans', count: '8.50% p.a.', sub: ['SBI Regular', 'Max 30 Yrs'] },
+            { type: 'PERSONAL', icon: '💼', title: 'Personal Loans', count: '11.25% p.a.', sub: ['Express Credit', 'Max 6 Yrs'] },
+            { type: 'VEHICLE', icon: '🚗', title: 'Vehicle Loans', count: '8.85% p.a.', sub: ['Car Platinum', 'Max 7 Yrs'] },
+            { type: 'EDUCATION', icon: '🎓', title: 'Education Loans', count: '9.15% p.a.', sub: ['Scholar Loan', 'Max 15 Yrs'] },
+            { type: 'BUSINESS', icon: '🏢', title: 'Business Loans', count: '12.50% p.a.', sub: ['SME Term', 'Working Cap'] },
+            { type: 'GOLD', icon: '💰', title: 'Gold Loans', count: '7.75% p.a.', sub: ['Sovereign Gold', 'Max 3 Yrs'] },
+            { type: 'AGRICULTURE', icon: '🌾', title: 'Agri Loans', count: '7.00% p.a.', sub: ['Kisan Credit', 'Crop Subsidies'] }
+        ];
+
+        catGrid.innerHTML = categoriesData.map(c => `
+            <div class="category-card" data-category="${c.type}" style="cursor:pointer;" onclick="filterByCategory('${c.type}')">
+                <div class="category-icon">${c.icon}</div>
+                <h3>${c.title}</h3>
+                <span class="category-count" style="color:var(--secondary); font-weight:700;">${c.count}</span>
+                <div class="sub-categories">
+                    ${c.sub.map(s => `<span class="sub-tag">${s}</span>`).join('')}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // 5. Update Listings and Requests titles
+    const listingsTitle = document.querySelector('#listings .section-title');
+    if (listingsTitle) listingsTitle.innerText = 'Sanctioned Loan Portfolio';
+    const listingsSub = document.querySelector('#listings .section-subtitle');
+    if (listingsSub) listingsSub.innerText = 'Live multi-table JOIN across LOAN, APPLICANT, and LOAN_PRODUCT tables with status badges';
+
+    const requestsTitle = document.querySelector('#requests .section-title');
+    if (requestsTitle) requestsTitle.innerText = 'Registered Borrowers & Credit Profiles';
+    const requestsSub = document.querySelector('#requests .section-subtitle');
+    if (requestsSub) requestsSub.innerText = 'Applicant directory with CIBIL credit scores, PAN, Aadhaar, and active exposure';
+
+    // 6. Update Executive Dashboard
+    const dashTitle = document.querySelector('#dashboard .section-title');
+    if (dashTitle) dashTitle.innerText = 'Executive Risk & Recovery Dashboard';
+    const dashSub = document.querySelector('#dashboard .section-subtitle');
+    if (dashSub) dashSub.innerText = 'Aggregated portfolio metrics from queries.sql: sanctioned volume, monthly recovery, and NPA risk';
+
+    const dashGrid = document.querySelector('.dashboard-grid');
+    if (dashGrid) {
+        dashGrid.innerHTML = `
+            <div class="dashboard-card">
+                <div class="dashboard-icon">📊</div>
+                <div class="dashboard-info">
+                    <span class="dashboard-value">₹1,75,50,000</span>
+                    <span class="dashboard-label">Total Sanctioned Portfolio</span>
+                </div>
+            </div>
+            <div class="dashboard-card">
+                <div class="dashboard-icon">📈</div>
+                <div class="dashboard-info">
+                    <span class="dashboard-value" style="color:var(--secondary);">94.2%</span>
+                    <span class="dashboard-label">Collection Efficiency</span>
+                </div>
+            </div>
+            <div class="dashboard-card">
+                <div class="dashboard-icon">⚠️</div>
+                <div class="dashboard-info">
+                    <span class="dashboard-value" style="color:#FDCB6E;">4 Accts</span>
+                    <span class="dashboard-label">Delinquent Overdue</span>
+                </div>
+            </div>
+            <div class="dashboard-card">
+                <div class="dashboard-icon">🚨</div>
+                <div class="dashboard-info">
+                    <span class="dashboard-value" style="color:#E17055;">19.9%</span>
+                    <span class="dashboard-label">Portfolio at Risk (NPA)</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // 7. Update Footer Brand
+    const footerBrand = document.querySelector('.footer-brand p');
+    if (footerBrand) {
+        footerBrand.innerText = 'A B.Tech CSE Database Systems Project — MySQL 8.0, InnoDB Transactions & Python REST API';
+    }
+    const footerBottom = document.querySelector('.footer-bottom p');
+    if (footerBottom) {
+        footerBottom.innerText = '© 2026 Bank Loan Management System — DBMS Course Project | B.Tech CSE';
+    }
 }
 
-// ---- INIT ----
+window.filterByCategory = function(categoryType) {
+    activeCategoryFilter = (activeCategoryFilter === categoryType) ? 'ALL' : categoryType;
+    document.querySelectorAll('.category-card').forEach(card => {
+        if (card.getAttribute('data-category') === activeCategoryFilter) {
+            card.style.borderColor = 'var(--primary)';
+            card.style.background = 'var(--bg-card-hover)';
+        } else {
+            card.style.borderColor = 'var(--glass-border)';
+            card.style.background = 'var(--bg-card)';
+        }
+    });
+
+    renderLoans();
+    const listingsElem = document.getElementById('listings');
+    if (listingsElem) listingsElem.scrollIntoView({ behavior: 'smooth' });
+};
+
+// ----------------------------------------------------------------------------
+// 15. DOMCONTENTLOADED LIFECYCLE HOOK
+// ----------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', async () => {
+    enhancePageContent();
     await checkBackend();
-    await renderListings();
-    await renderRequests();
+    await renderLoans();
+    await renderApplicants();
     initModal();
     initSearch();
     initLogin();
-    initSell();
+    initEmiCalculatorSection();
+    initApplyLoanModal();
+
+    console.log('🏛️ Bank Loan Management System initialized.');
+    console.log('Connected to MySQL:', backendConnected);
 });

@@ -1,366 +1,260 @@
-# 🔄 CampusSwap — Student Marketplace
+# 🏦 Bank Loan Management System: EMI Processing, Repayment Tracking, and Risk Assessment
 
-> A comprehensive DBMS course project: a campus marketplace where students can buy and sell used textbooks, electronics, sports gear, and more.
+> A comprehensive, enterprise-grade Database Management Systems (DBMS) course project: modeling the complete retail and commercial lending lifecycle, reducing-balance EMI amortization schedules, active default detection, and risk analytics.
 
-![Database](https://img.shields.io/badge/Database-MySQL%208.0-blue?logo=mysql&logoColor=white)
-![Python](https://img.shields.io/badge/Seed%20Data-Python%20+%20Faker-green?logo=python&logoColor=white)
-![Frontend](https://img.shields.io/badge/Frontend-HTML%2FCSS%2FJS-orange?logo=html5&logoColor=white)
-![License](https://img.shields.io/badge/License-Academic%20Project-purple)
-
----
-
-## 📋 Problem Statement
-
-Students in hostels frequently need to buy/sell used items — textbooks at semester start, sports equipment, electronics, furniture at graduation. Existing solutions (WhatsApp groups, notice boards) are unorganized, untrustworthy, and have no pricing transparency.
-
-**CampusSwap** solves this by providing:
-- A structured marketplace with categories and sub-categories
-- Verified student sellers with ratings and reviews
-- Price tracking and audit trails
-- "Wanted" request board for items not yet listed
-- Transaction safety through ACID-compliant order processing
+![Database](https://img.shields.io/badge/Database-MySQL%208.0%20(InnoDB)-blue?logo=mysql&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.10%20%2B%20Faker%20(en__IN)-green?logo=python&logoColor=white)
+![Backend](https://img.shields.io/badge/Backend-Flask%20REST%20API-red?logo=flask&logoColor=white)
+![Frontend](https://img.shields.io/badge/Frontend-HTML5%20%2F%20CSS3%20%2F%20JS-orange?logo=javascript&logoColor=white)
+![Documentation](https://img.shields.io/badge/Docs-LaTeX%20(report.tex)-darkblue?logo=latex&logoColor=white)
+![Compliance](https://img.shields.io/badge/Standards-RBI%20IRACP%20Norms-purple)
 
 ---
 
-## 🏗️ Project Architecture
+## 📋 Problem Statement & Objectives
+
+Commercial banks and financial institutions process thousands of loan applications spanning diverse portfolios (*Home, Personal, Vehicle, Education, Business, Gold, Agriculture*). Traditional ledger maintenance suffers from:
+1. **Lack of ACID Transaction Safety:** Concurrency race conditions when multiple payment channels (UPI, auto-debit, cheque) attempt simultaneous installment settlement.
+2. **Amortization Inaccuracies:** Manual rounding drift in reducing-balance monthly interest calculations across long tenures (up to 360 months).
+3. **Delayed Default Identification:** Failure to track Special Mention Accounts (SMA-0, SMA-1, SMA-2) leading to unmitigated Non-Performing Assets (NPAs).
+4. **Data Redundancy & Anomalies:** Denormalized loan ledgers causing insertion, update, and deletion anomalies.
+
+**This project solves these challenges through:**
+- **Normalized Relational Architecture (BCNF):** 8 tables with zero redundancy and strict referential integrity.
+- **Automated Reducing-Balance EMI Engine:** Stored procedure computing principal/interest breakdown with zero residual balance.
+- **Pessimistic Locking & ACID Compliance:** Two-phase locking (`SELECT ... FOR UPDATE`) preventing double repayments.
+- **Event-Driven Risk Automation:** Triggers classifying loans as `DEFAULTED` (90-day overdue rule) and logging SARFAESI actions.
+- **Interactive Full-Stack Web Application:** Visual query inspection with a dedicated "How It Works" modal.
+
+---
+
+## 🏗️ Project Architecture & Directory Layout
 
 ```
-campusswap/
+dbms-bank-loan-system/
 ├── sql/
-│   ├── schema.sql               ← Stage 2: Tables, FKs, CHECKs, ENUMs
-│   ├── seed.sql                 ← Stage 3: 100 users, 500 listings, etc.
-│   ├── queries.sql              ← Stage 4: 10 queries, views, relational algebra
-│   ├── normalization.sql        ← Stage 5: 1NF→2NF→3NF→BCNF decomposition
-│   ├── procedures_triggers.sql  ← Stage 6: ACID procedures, triggers, cursors
-│   └── indexes_concurrency.sql  ← Stage 7: B+ tree indexes, concurrency control
+│   ├── schema.sql               ← Stage 2: 8 Tables, PK/FK, CHECKs, ENUMs (InnoDB)
+│   ├── seed.sql                 ← Stage 3: 80 applicants, 10 products, 120 loans, 4000+ EMIs
+│   ├── queries.sql              ← Stage 4: 10 analytical queries, views, relational algebra
+│   ├── normalization.sql        ← Stage 5: LOAN_RAW → 1NF → 2NF → 3NF → BCNF decomposition
+│   ├── procedures_triggers.sql  ← Stage 6: ACID procedures, overdue triggers, audit trail
+│   └── indexes_concurrency.sql  ← Stage 7: B+ tree indexes, EXPLAIN plans, 2-session locking
 ├── scripts/
-│   └── generate_seed.py         ← Python script to generate seed.sql with Faker
+│   └── generate_seed.py         ← Deterministic Python Faker script (seed=42) generating seed.sql
 ├── backend/
-│   ├── app.py                  ← Flask REST API connecting frontend to MySQL
+│   ├── app.py                  ← Flask REST API connecting frontend to MySQL bank_loan_db
 │   └── requirements.txt         ← flask, flask-cors, mysql-connector-python
 ├── frontend/
-│   ├── index.html               ← Marketplace UI with "How it Works" button
-│   ├── styles.css               ← Glassmorphic dark theme
-│   └── app.js                   ← Listings, search, SQL showcase modal, API client
+│   ├── index.html               ← LoanFlow Portal UI with live EMI calculator & "How It Works"
+│   ├── styles.css               ← Dark glassmorphic banking theme
+│   └── app.js                   ← Amortization calculator, search, live REST API client
 ├── docs/
-│   └── er-design.md             ← ER diagram, mapping, viva Q&A
+│   ├── er-design.md             ← Comprehensive ER documentation, data dictionary, viva Q&A
+│   └── report.tex               ← Complete LaTeX project report adhering to college template
 └── README.md                    ← You are here
 ```
 
 ---
 
-## 🗺️ ER Diagram
+## 🗺️ Entity-Relationship (ER) Diagram
 
 ```mermaid
 erDiagram
-    USER {
-        int user_id PK
+    APPLICANT ||--o{ LOAN : "applies for"
+    LOAN_PRODUCT ||--o{ LOAN : "defines terms"
+    GUARANTOR ||--o{ LOAN : "guarantees"
+    LOAN ||--|{ EMI_SCHEDULE : "generates"
+    EMI_SCHEDULE ||--o{ REPAYMENT : "receives payment"
+    LOAN ||--o{ DEFAULT_LOG : "may default"
+    LOAN ||--o{ LOAN_AUDIT : "audited"
+
+    APPLICANT {
+        int applicant_id PK
         varchar name
         varchar email UK
         varchar phone
-        varchar hostel_block
-        varchar room_no
-        datetime joined_at
+        varchar pan_no UK
+        varchar aadhaar_no UK
+        decimal annual_income "CHECK >= 0"
+        int credit_score "CHECK [300, 900]"
+        enum employment_type
     }
 
-    SELLER {
-        int seller_id PK, FK
-        varchar upi_id
-        decimal total_sales
-        decimal avg_rating
-    }
-
-    BUYER {
-        int buyer_id PK, FK
-        decimal wallet_balance
-    }
-
-    CATEGORY {
-        int category_id PK
+    LOAN_PRODUCT {
+        int product_id PK
         varchar name
-        int parent_category_id FK
+        enum product_type "HOME, PERSONAL, VEHICLE, etc."
+        decimal interest_rate "CHECK > 0"
+        decimal min_amount
+        decimal max_amount "CHECK max >= min"
+        int min_tenure_months
+        int max_tenure_months "CHECK max >= min"
+        decimal penalty_rate_pct
     }
 
-    LISTING {
-        int listing_id PK
-        int seller_id FK
-        int category_id FK
-        varchar title
-        decimal price
-        int quantity
-        enum condition
-        enum status
+    GUARANTOR {
+        int guarantor_id PK
+        varchar name
+        varchar phone
+        varchar pan_no
+        varchar relationship
+        decimal annual_income "CHECK >= 0"
     }
 
-    BOOK_DETAILS {
-        int listing_id PK, FK
-        varchar isbn
-        varchar author
-        varchar edition
-        varchar subject
+    LOAN {
+        int loan_id PK
+        int applicant_id FK
+        int product_id FK
+        int guarantor_id FK "nullable"
+        decimal principal_amount "CHECK > 0"
+        decimal interest_rate "CHECK > 0"
+        int tenure_months "CHECK > 0"
+        decimal emi_amount "CHECK > 0"
+        decimal total_payable
+        enum status "PENDING, APPROVED, ACTIVE, CLOSED, DEFAULTED, REJECTED"
     }
 
-    ORDERS {
-        int order_id PK
-        int buyer_id FK
-        datetime order_date
-        decimal total_amount
-        enum status
+    EMI_SCHEDULE {
+        int emi_id PK
+        int loan_id FK
+        int installment_no
+        date due_date
+        decimal principal_component
+        decimal interest_component
+        decimal emi_amount
+        decimal balance_after
+        enum status "PENDING, PAID, OVERDUE, PARTIALLY_PAID"
+        decimal penalty_amount
     }
 
-    ORDER_ITEM {
-        int item_id PK
-        int order_id FK
-        int listing_id FK
-        int quantity
-        decimal price_at_purchase
+    REPAYMENT {
+        int repayment_id PK
+        int emi_id FK
+        int loan_id FK
+        decimal amount_paid "CHECK > 0"
+        datetime payment_date
+        enum payment_mode "CASH, CHEQUE, NEFT, UPI, AUTO_DEBIT"
+        varchar transaction_ref UK
+        decimal late_fee
     }
 
-    PAYMENT {
-        int payment_id PK
-        int order_id FK
-        decimal amount
-        enum method
-        enum status
+    DEFAULT_LOG {
+        int default_id PK
+        int loan_id FK
+        date default_date
+        decimal outstanding_amount
+        int months_overdue "CHECK >= 1"
+        enum action_taken "NOTICE_SENT, LEGAL_ACTION, RECOVERY_AGENT, WRITE_OFF, RESTRUCTURED"
+        boolean resolved
     }
 
-    REQUEST {
-        int request_id PK
-        int user_id FK
-        int category_id FK
-        varchar title
-        decimal budget_max
-        enum status
+    LOAN_AUDIT {
+        int audit_id PK
+        int loan_id
+        varchar field_changed
+        varchar old_value
+        varchar new_value
+        datetime changed_at
+        varchar changed_by
     }
-
-    REVIEW {
-        int review_id PK
-        int reviewer_id FK
-        int listing_id FK
-        tinyint rating
-        text comment
-    }
-
-    USER ||--o| SELLER : "specializes into"
-    USER ||--o| BUYER : "specializes into"
-    SELLER ||--o{ LISTING : "creates"
-    CATEGORY ||--o{ LISTING : "classifies"
-    CATEGORY ||--o{ CATEGORY : "has sub-category"
-    LISTING ||--o| BOOK_DETAILS : "may have"
-    BUYER ||--o{ ORDERS : "places"
-    ORDERS ||--|{ ORDER_ITEM : "contains"
-    LISTING ||--o{ ORDER_ITEM : "appears in"
-    ORDERS ||--|| PAYMENT : "paid via"
-    USER ||--o{ REQUEST : "posts"
-    USER ||--o{ REVIEW : "writes"
-    LISTING ||--o{ REVIEW : "receives"
 ```
 
-**Specialization**: USER → SELLER/BUYER is **overlapping** (can be both) and **partial** (can be neither).
+---
+
+## 🗄️ Relational Schema Summary (8 Tables)
+
+| Table | Primary Key | Foreign Keys | Key Constraints & Integrity Rules |
+|-------|-------------|--------------|-----------------------------------|
+| `APPLICANT` | `applicant_id` | — | `email` UNIQUE, `pan_no` UNIQUE, `aadhaar_no` UNIQUE, `credit_score BETWEEN 300 AND 900`, `annual_income >= 0` |
+| `LOAN_PRODUCT` | `product_id` | — | `interest_rate > 0`, `max_amount >= min_amount`, `max_tenure >= min_tenure`, `penalty_rate_pct >= 0` |
+| `GUARANTOR` | `guarantor_id` | — | `annual_income >= 0` |
+| `LOAN` | `loan_id` | `applicant_id`, `product_id`, `guarantor_id` | `principal_amount > 0`, `emi_amount > 0`, `total_payable >= principal`, `ON DELETE RESTRICT` (Applicant/Product), `ON DELETE SET NULL` (Guarantor) |
+| `EMI_SCHEDULE` | `emi_id` | `loan_id` | `UNIQUE(loan_id, installment_no)`, `principal + interest = emi`, `balance_after >= 0`, `ON DELETE CASCADE` |
+| `REPAYMENT` | `repayment_id` | `emi_id`, `loan_id` | `amount_paid > 0`, `transaction_ref` UNIQUE, `late_fee >= 0`, `ON DELETE RESTRICT` (Immutable ledger) |
+| `DEFAULT_LOG` | `default_id` | `loan_id` | `months_overdue >= 1`, `outstanding_amount > 0`, `ON DELETE RESTRICT` |
+| `LOAN_AUDIT` | `audit_id` | `loan_id` | Immutable forensic log populated via database triggers |
 
 ---
 
-## 🗄️ Schema Summary
+## 📐 Mathematical Formulation of EMI (Reducing Balance Method)
 
-| Table | PK | Notable Constraints |
-|-------|-----|---------------------|
-| `USER` | user_id (AUTO_INCREMENT) | email UNIQUE |
-| `SELLER` | seller_id (FK → USER) | ON DELETE CASCADE |
-| `BUYER` | buyer_id (FK → USER) | ON DELETE CASCADE |
-| `CATEGORY` | category_id | Self-ref FK (parent_category_id) |
-| `LISTING` | listing_id | CHECK price > 0, ENUM status/condition |
-| `BOOK_DETAILS` | listing_id (FK → LISTING) | ISBN, author, edition |
-| `ORDERS` | order_id | CHECK total_amount >= 0 |
-| `ORDER_ITEM` | item_id | CHECK quantity > 0, price > 0 |
-| `PAYMENT` | payment_id | ENUM method (UPI/CASH/WALLET) |
-| `REQUEST` | request_id | CHECK budget_max > 0 OR NULL |
-| `REVIEW` | review_id | CHECK rating BETWEEN 1 AND 5, UNIQUE(reviewer, listing) |
-| `PRICE_AUDIT` | audit_id | Filled by trigger, not application |
+For a principal $P$, monthly interest rate $r = \frac{\text{Annual Rate}}{12 \times 100}$, and tenure $n$ months, the monthly installment $E$ is:
+
+$$E = P \cdot \frac{r(1+r)^n}{(1+r)^n - 1}$$
+
+For each installment $k \in \{1, 2, \dots, n\}$:
+- **Interest Component:** $I_k = B_{k-1} \cdot r$
+- **Principal Component:** $P_k = E - I_k$
+- **Remaining Balance:** $B_k = B_{k-1} - P_k$ where $B_0 = P$ and $B_n \equiv 0.00$
 
 ---
 
-## 🚀 How to Run
+## 🚀 How to Run the Complete Project
 
 ### Prerequisites
-- **MySQL 8.0+** installed
-- **Python 3.8+** with `pip install faker`
-- A web browser (for the frontend)
+- **MySQL 8.0+** installed and running on port 3306
+- **Python 3.8+** with `faker`, `flask`, `flask-cors`, and `mysql-connector-python`
+- Modern web browser (Chrome, Edge, Firefox)
 
-### Step-by-Step
+### Step-by-Step Execution Guide
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/campusswap-dbms.git
-cd campusswap-dbms
+# 1. Clone repository
+git clone https://github.com/YOUR_USERNAME/bank-loan-management-system.git
+cd bank-loan-management-system
 
-# 2. Create the database and tables in MySQL
+# 2. Initialize Database & Tables in MySQL
 mysql -u root -p < sql/schema.sql
 
-# 3. Generate seed data (100 users, 500 listings, 300 orders)
-pip install faker
-cd scripts
-python generate_seed.py
-cd ..
-
-# 4. Load seed data into MySQL
-mysql -u root -p < sql/seed.sql
-
-# 5. Run queries, views, procedures, and triggers
-mysql -u root -p campusswap < sql/queries.sql
-mysql -u root -p campusswap < sql/procedures_triggers.sql
-mysql -u root -p campusswap < sql/indexes_concurrency.sql
-
-# 6. Start the Backend API (Connects Frontend directly to MySQL)
+# 3. Generate & Load Synthetic Seed Data
 pip install -r backend/requirements.txt
-python backend/app.py
+pip install faker
+python scripts/generate_seed.py
+mysql -u root -p bank_loan_db < sql/seed.sql
+
+# 4. Execute Queries, Procedures, Triggers, and Indexes
+mysql -u root -p bank_loan_db < sql/queries.sql
+mysql -u root -p bank_loan_db < sql/procedures_triggers.sql
+mysql -u root -p bank_loan_db < sql/indexes_concurrency.sql
+
+# 5. Start the RESTful Flask Backend
+cd backend
+python app.py
 # Server runs on: http://localhost:5000
 
-# 7. Open the App in Browser:
-# Visit http://localhost:5000 (served directly by Flask)
-# OR double-click frontend/index.html
-# The frontend automatically detects the live MySQL connection!
+# 6. Access the Application
+# Open http://localhost:5000 in your browser
+# The frontend connects to MySQL with live query demonstrations!
 ```
 
 ---
 
-## 📊 Sample Query Outputs
+## 📊 Core Analytical Queries & Views
 
-### Top 5 Sellers by Revenue
-```
-+------------------+---------------+
-| seller_name      | total_revenue |
-+------------------+---------------+
-| Arjun Sharma     |     15420.00  |
-| Priya Mehta      |     12350.00  |
-| Rohit Kumar      |      9800.00  |
-| Sneha Reddy      |      8650.00  |
-| Vikram Desai     |      7200.00  |
-+------------------+---------------+
-```
-
-### Categories With 10+ Listings
-```
-+--------------------+---------------+
-| category_name      | listing_count |
-+--------------------+---------------+
-| Engineering Books  |            85 |
-| Electronics        |            62 |
-| Fiction            |            45 |
-+--------------------+---------------+
-```
-
-### EXPLAIN Before/After Indexing
-```
--- BEFORE: type=ALL, rows=5000 (full table scan!)
--- AFTER:  type=range, rows=47  (B+ tree index lookup)
-```
+1. **Overdue Loans Report:** Consolidates delinquent borrowers, overdue installment counts, and total overdue demand (`JOIN` + `GROUP BY` + `HAVING`).
+2. **Portfolio-wise Outstanding Analysis:** Aggregates disbursed capital, active debt exposure, and NPA rates across loan product types.
+3. **Defaulter List (RBI NPA Norms):** Identifies accounts with $\ge 3$ consecutive unpaid EMIs (90+ day delinquency).
+4. **Monthly Collection Efficiency:** Measures recovery percentage: $\frac{\text{Amount Collected}}{\text{Amount Due}} \times 100$.
+5. **Aging Analysis (SMA Buckets):** Classifies overdue loans into SMA-0 (1-30 days), SMA-1 (31-60 days), SMA-2 (61-90 days), and NPA (90+ days).
 
 ---
 
-## 📝 Unit-wise Coverage
+## 🎓 Viva Voce & Defense Cheat Sheet
 
-| Unit | Concepts Covered | File |
-|------|-----------------|------|
-| **Unit I** | ER model, specialization, mapping rules | `docs/er-design.md` |
-| **Unit II** | Queries, JOINs, subqueries, GROUP BY, HAVING, SET operators, views, relational algebra | `sql/queries.sql` |
-| **Unit III** | Normalization (1NF → BCNF), FDs, closure, anomalies | `sql/normalization.sql` |
-| **Unit IV** | Stored procedures, triggers, cursors, ACID transactions | `sql/procedures_triggers.sql` |
-| **Unit V** | B+ tree indexes, EXPLAIN, concurrency (SELECT FOR UPDATE), deadlocks | `sql/indexes_concurrency.sql` |
-
----
-
-## ❓ Viva Questions & Answers
-
-### ER Design
-**Q: Why is USER→SELLER/BUYER overlapping and partial?**
-> A user can be BOTH a seller and buyer (overlapping). Not every user has to be either — new users just browse (partial).
-
-**Q: Why use a self-referencing FK on CATEGORY?**
-> It creates a tree structure: Books → Engineering Books → CSE. Any depth is possible with the same table design.
-
-**Q: Why is ORDER_ITEM needed?**
-> One order can have multiple items (1:M). Without it, we'd need repeating groups, violating 1NF.
-
-### Schema
-**Q: Why DECIMAL instead of FLOAT for prices?**
-> FLOAT has rounding errors (0.1 + 0.2 ≠ 0.3). DECIMAL stores exact values — critical for financial data.
-
-**Q: Why ON DELETE CASCADE on SELLER but RESTRICT on CATEGORY?**
-> Deleting a user should clean up their seller profile (CASCADE). Deleting a category with listings would orphan data — RESTRICT forces re-categorization first.
-
-**Q: Why store price_at_purchase in ORDER_ITEM?**
-> Seller might change the listing price later. The order records the actual price paid — it's a historical fact.
-
-**Q: Why MySQL instead of Oracle?**
-> MySQL is free, portable, and supports the same features (FK, triggers, procedures, transactions). The SQL is 95% identical. Oracle uses SEQUENCE instead of AUTO_INCREMENT, VARCHAR2 instead of VARCHAR, and MINUS instead of EXCEPT.
-
-### Queries
-**Q: Difference between WHERE and HAVING?**
-> WHERE filters individual rows BEFORE grouping. HAVING filters groups AFTER aggregation. You can't use aggregate functions (COUNT, SUM) in WHERE.
-
-**Q: What is a correlated subquery?**
-> A subquery that references a column from the outer query. It re-executes for every row in the outer table. Regular subqueries run only once.
-
-**Q: How does LEFT JOIN find "missing" records?**
-> LEFT JOIN keeps ALL rows from the left table. If there's no match on the right, those columns are NULL. Filtering `WHERE right.id IS NULL` gives rows with no match.
-
-**Q: Why UNION instead of UNION ALL?**
-> UNION removes duplicates. UNION ALL keeps them. Use UNION ALL when you know there are no duplicates (it's faster).
-
-### Normalization
-**Q: What is a functional dependency?**
-> X → Y means "if you know X, you can uniquely determine Y." Example: email → name (knowing email tells you the name).
-
-**Q: What are the normal forms?**
-> 1NF: atomic values, no repeating groups. 2NF: no partial dependencies (all non-key attributes depend on the FULL key). 3NF: no transitive dependencies. BCNF: every determinant is a candidate key.
-
-**Q: What is attribute closure?**
-> Start with a set of attributes, repeatedly apply FDs to find all attributes that can be determined. If the closure equals all attributes, it's a superkey.
-
-### Transactions & Triggers
-**Q: What does ACID mean?**
-> Atomicity: all-or-nothing. Consistency: DB stays valid. Isolation: concurrent transactions don't interfere. Durability: committed data survives crashes.
-
-**Q: Why use a trigger instead of application code?**
-> Triggers enforce rules at the database level — can't be bypassed by buggy application code. Example: auto-marking listing as SOLD when quantity reaches 0.
-
-**Q: What is a cursor?**
-> An iterator that processes rows one by one. Useful when row-by-row logic is needed. In practice, a single UPDATE is faster, but cursors demonstrate the concept for your syllabus.
-
-### Indexing & Concurrency
-**Q: What is a B+ tree index?**
-> A balanced tree where internal nodes guide the search and leaf nodes (linked in order) store pointers to rows. All leaf nodes are at the same depth, guaranteeing O(log n) lookups.
-
-**Q: What is the leftmost prefix rule?**
-> A composite index on (A, B) helps queries filtering on A, or A+B, but NOT B alone. Like a phone book sorted by (last_name, first_name).
-
-**Q: What does SELECT ... FOR UPDATE do?**
-> Locks the selected rows until COMMIT/ROLLBACK. Other transactions trying to read the same rows with FOR UPDATE will WAIT. Prevents race conditions like two buyers purchasing the last copy.
-
-**Q: What is a deadlock?**
-> Two transactions each hold a lock and wait for the other's lock. Neither can proceed. MySQL detects this and kills one transaction.
+1. **Why MySQL 8.0 and InnoDB?**
+   - MySQL 8.0 strictly enforces `CHECK` constraints (MySQL 5.7 ignored them). InnoDB guarantees ACID transactions, row-level exclusive locking (`SELECT ... FOR UPDATE`), and foreign key referential integrity.
+2. **Why `DECIMAL(12,2)` instead of `FLOAT` or `DOUBLE`?**
+   - Floating-point representations introduce binary fractional approximations (IEEE 754). `DECIMAL` provides exact fixed-point base-10 arithmetic mandatory for financial ledgers.
+3. **How is double repayment prevented under high concurrency?**
+   - The stored procedure `process_repayment()` uses pessimistic locking (`SELECT ... FOR UPDATE`) on the target installment row, forcing concurrent webhooks into lock waits until the first transaction commits.
+4. **Why B+ Trees for financial databases?**
+   - High fan-out (1,000+ keys per 16 KB page) limits tree height to 3 levels, ensuring $\mathcal{O}(\log_B N)$ lookup. Doubly-linked leaf nodes enable ultra-fast range queries for date-bound reporting.
+5. **How does normalization prevent anomalies?**
+   - Decomposing the universal relation `LOAN_RAW` into 8 BCNF tables isolates functional dependencies, eliminating redundant multi-installment customer attributes and preventing insertion, update, and deletion anomalies.
 
 ---
 
-## 👥 Team
-
-| Name | Contribution |
-|------|-------------|
-| — | Schema, ER Design |
-| — | Queries, Views |
-| — | Normalization |
-| — | Procedures, Triggers |
-| — | Frontend, Report |
-
----
-
-## 📄 License
-
-Academic project for DBMS course (B.Tech CSE). Not for commercial use.
-
----
-
-<p align="center">
-  Built with MySQL, Python, and ❤️ by B.Tech CSE students<br>
-  <em>Click "How it Works" in the frontend to see the SQL behind every feature!</em>
-</p>
+## 📜 Academic Attribution
+- **Course:** A9511 - Database Management Systems (B.Tech CSE)
+- **Institution:** Vardhaman College of Engineering, Hyderabad
+- **Course Facilitator:** Dr. Reddy Saisindhutheja, Associate Professor

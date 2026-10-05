@@ -1,306 +1,450 @@
 -- ============================================================================
--- CampusSwap — Campus Marketplace Database Schema
--- Database  : MySQL 8.0+
--- Run       : mysql -u root -p < schema.sql
+-- Bank Loan Management System: EMI Processing, Repayment Tracking, and Risk Assessment
+-- Database Management Systems — Course Project (B.Tech CSE)
+-- Database Engine : MySQL 8.0+ (InnoDB Storage Engine)
+-- Character Set   : utf8mb4 (Unicode Support)
+-- Collation       : utf8mb4_unicode_ci
+-- Execution       : mysql -u <username> -p < schema.sql
 -- ============================================================================
--- WHY MySQL?
---   Your college teaches Oracle SQL*Plus, but MySQL is free, runs on any
---   laptop, and supports triggers, procedures, transactions, and CHECK
---   constraints (from v8.0). The SQL is 95% identical; differences are
---   noted in comments so you can defend the choice in viva.
--- ============================================================================
-
-DROP DATABASE IF EXISTS campusswap;
-CREATE DATABASE campusswap CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE campusswap;
-
--- ============================================================================
--- 1. USER — any registered student on the platform
--- ============================================================================
--- DESIGN DECISION: We keep one USER table and add optional SELLER / BUYER
--- child tables. This is "overlapping, partial" specialization because a user
--- can be both a seller AND a buyer, and some users may be neither yet.
--- In Oracle you would use VARCHAR2 instead of VARCHAR; rest stays the same.
-
-CREATE TABLE `USER` (
-    user_id       INT           AUTO_INCREMENT,
-    name          VARCHAR(100)  NOT NULL,
-    email         VARCHAR(150)  NOT NULL,
-    phone         VARCHAR(15),
-    hostel_block  VARCHAR(20),           -- e.g. "Block-A", "Girls Hostel-2"
-    room_no       VARCHAR(10),
-    joined_at     DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT pk_user       PRIMARY KEY (user_id),
-    CONSTRAINT uq_user_email UNIQUE      (email)
-    -- VIVA NOTE: UNIQUE on email prevents duplicate registrations.
-    -- AUTO_INCREMENT is MySQL's version of Oracle's SEQUENCE + TRIGGER.
-) ENGINE=InnoDB;
-
-
--- ============================================================================
--- 2. SELLER — specialization of USER (overlapping, partial)
--- ============================================================================
--- A user becomes a SELLER when they list their first item.
--- upi_id stores their UPI handle for receiving payments.
-
-CREATE TABLE SELLER (
-    seller_id    INT,
-    upi_id       VARCHAR(50),
-    total_sales  DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    avg_rating   DECIMAL(3,2)  NOT NULL DEFAULT 0.00,
-
-    CONSTRAINT pk_seller PRIMARY KEY (seller_id),
-    CONSTRAINT fk_seller_user FOREIGN KEY (seller_id)
-        REFERENCES `USER`(user_id)
-        ON DELETE CASCADE
-    -- ON DELETE CASCADE: if the user account is deleted, their seller
-    -- profile goes too. This maintains referential integrity.
-) ENGINE=InnoDB;
-
-
--- ============================================================================
--- 3. BUYER — specialization of USER (overlapping, partial)
--- ============================================================================
--- A user becomes a BUYER when they place their first order.
-
-CREATE TABLE BUYER (
-    buyer_id        INT,
-    wallet_balance  DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-
-    CONSTRAINT pk_buyer PRIMARY KEY (buyer_id),
-    CONSTRAINT fk_buyer_user FOREIGN KEY (buyer_id)
-        REFERENCES `USER`(user_id)
-        ON DELETE CASCADE
-) ENGINE=InnoDB;
-
-
--- ============================================================================
--- 4. CATEGORY — with self-referencing FK for sub-categories
--- ============================================================================
--- DESIGN DECISION: parent_category_id points back to the same table.
--- This lets us model "Books > Engineering > CSE" as a tree.
--- A NULL parent means it is a top-level (root) category.
-
-CREATE TABLE CATEGORY (
-    category_id         INT          AUTO_INCREMENT,
-    name                VARCHAR(100) NOT NULL,
-    parent_category_id  INT          DEFAULT NULL,
-
-    CONSTRAINT pk_category PRIMARY KEY (category_id),
-    CONSTRAINT fk_category_parent FOREIGN KEY (parent_category_id)
-        REFERENCES CATEGORY(category_id)
-        ON DELETE SET NULL
-    -- ON DELETE SET NULL: if a parent category is removed, children become
-    -- top-level instead of being deleted. Preserves data.
-) ENGINE=InnoDB;
-
-
--- ============================================================================
--- 5. LISTING — an item put up for sale
--- ============================================================================
--- ENUM columns store a fixed set of allowed values. MySQL enforces them;
--- in Oracle you would use a CHECK constraint with IN(...) instead.
-
-CREATE TABLE LISTING (
-    listing_id   INT            AUTO_INCREMENT,
-    seller_id    INT            NOT NULL,
-    category_id  INT            NOT NULL,
-    title        VARCHAR(200)   NOT NULL,
-    description  TEXT,
-    price        DECIMAL(10,2)  NOT NULL,
-    quantity     INT            NOT NULL DEFAULT 1,
-    `condition`  ENUM('NEW','LIKE_NEW','GOOD','FAIR','POOR') NOT NULL DEFAULT 'GOOD',
-    status       ENUM('ACTIVE','SOLD','EXPIRED','REMOVED')   NOT NULL DEFAULT 'ACTIVE',
-    image_url    VARCHAR(500),
-    created_at   DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at   DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    CONSTRAINT pk_listing       PRIMARY KEY (listing_id),
-    CONSTRAINT fk_listing_seller   FOREIGN KEY (seller_id)
-        REFERENCES SELLER(seller_id) ON DELETE CASCADE,
-    CONSTRAINT fk_listing_category FOREIGN KEY (category_id)
-        REFERENCES CATEGORY(category_id) ON DELETE RESTRICT,
-    CONSTRAINT chk_listing_price CHECK (price > 0),
-    CONSTRAINT chk_listing_qty   CHECK (quantity >= 0)
-    -- CHECK (price > 0): prevents someone listing a free item by accident.
-    -- ON DELETE RESTRICT on category: you can't delete a category that has
-    -- listings — forces the admin to re-categorize first.
-) ENGINE=InnoDB;
-
-
--- ============================================================================
--- 6. BOOK_DETAILS — specialization of LISTING for books
--- ============================================================================
--- Not every listing is a book. Only book listings get an entry here.
--- This is an IS-A relationship (LISTING --specializes--> BOOK_DETAILS).
-
-CREATE TABLE BOOK_DETAILS (
-    listing_id  INT,
-    isbn        VARCHAR(20),
-    author      VARCHAR(200),
-    edition     VARCHAR(50),
-    subject     VARCHAR(100),
-
-    CONSTRAINT pk_book_details PRIMARY KEY (listing_id),
-    CONSTRAINT fk_book_listing FOREIGN KEY (listing_id)
-        REFERENCES LISTING(listing_id)
-        ON DELETE CASCADE
-    -- CASCADE: if the listing is deleted, its book details go too.
-) ENGINE=InnoDB;
-
-
--- ============================================================================
--- 7. ORDERS — a purchase made by a buyer
--- ============================================================================
--- Named ORDERS (not ORDER) because ORDER is a reserved SQL keyword.
-
-CREATE TABLE ORDERS (
-    order_id      INT            AUTO_INCREMENT,
-    buyer_id      INT            NOT NULL,
-    order_date    DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    total_amount  DECIMAL(10,2)  NOT NULL DEFAULT 0.00,
-    status        ENUM('PENDING','CONFIRMED','DELIVERED','CANCELLED')
-                                 NOT NULL DEFAULT 'PENDING',
-
-    CONSTRAINT pk_orders PRIMARY KEY (order_id),
-    CONSTRAINT fk_orders_buyer FOREIGN KEY (buyer_id)
-        REFERENCES BUYER(buyer_id) ON DELETE CASCADE,
-    CONSTRAINT chk_order_total CHECK (total_amount >= 0)
-) ENGINE=InnoDB;
-
-
--- ============================================================================
--- 8. ORDER_ITEM — line items within an order (many-to-many resolver)
--- ============================================================================
--- One order can contain multiple listings, and one listing can appear in
--- multiple orders. ORDER_ITEM resolves this M:N relationship.
--- price_at_purchase stores the price at the time of purchase — the listing
--- price might change later, but the invoice should stay the same.
-
-CREATE TABLE ORDER_ITEM (
-    item_id            INT           AUTO_INCREMENT,
-    order_id           INT           NOT NULL,
-    listing_id         INT           NOT NULL,
-    quantity           INT           NOT NULL DEFAULT 1,
-    price_at_purchase  DECIMAL(10,2) NOT NULL,
-
-    CONSTRAINT pk_order_item PRIMARY KEY (item_id),
-    CONSTRAINT fk_oi_order   FOREIGN KEY (order_id)
-        REFERENCES ORDERS(order_id) ON DELETE CASCADE,
-    CONSTRAINT fk_oi_listing FOREIGN KEY (listing_id)
-        REFERENCES LISTING(listing_id) ON DELETE RESTRICT,
-    CONSTRAINT chk_oi_qty   CHECK (quantity > 0),
-    CONSTRAINT chk_oi_price CHECK (price_at_purchase > 0)
-    -- ON DELETE RESTRICT on listing: we never delete a listing that has
-    -- been ordered — it's part of the purchase history.
-) ENGINE=InnoDB;
-
-
--- ============================================================================
--- 9. PAYMENT — payment details for an order
+-- WHY MySQL 8.0 & InnoDB?
+-- 1. Full CHECK Constraint enforcement: MySQL 8.0+ parses AND strictly enforces
+--    CHECK constraints (unlike MySQL 5.7 which parsed but ignored them).
+-- 2. InnoDB Storage Engine: Provides ACID-compliant transactions, robust row-level
+--    locking, foreign key constraint enforcement, and crash recovery.
+-- 3. High Precision Arithmetic: Uses standard DECIMAL types for monetary and
+--    interest computations to prevent IEEE 754 floating-point rounding errors.
 -- ============================================================================
 
-CREATE TABLE PAYMENT (
-    payment_id  INT            AUTO_INCREMENT,
-    order_id    INT            NOT NULL,
-    amount      DECIMAL(10,2)  NOT NULL,
-    method      ENUM('UPI','CASH','WALLET') NOT NULL,
-    status      ENUM('PENDING','COMPLETED','FAILED','REFUNDED')
-                               NOT NULL DEFAULT 'PENDING',
-    paid_at     DATETIME,
-
-    CONSTRAINT pk_payment PRIMARY KEY (payment_id),
-    CONSTRAINT fk_payment_order FOREIGN KEY (order_id)
-        REFERENCES ORDERS(order_id) ON DELETE CASCADE,
-    CONSTRAINT chk_payment_amt CHECK (amount > 0)
-) ENGINE=InnoDB;
-
+DROP DATABASE IF EXISTS `bank_loan_db`;
+CREATE DATABASE `bank_loan_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `bank_loan_db`;
 
 -- ============================================================================
--- 10. REQUEST — "wanted" posts by students looking for specific items
+-- 1. APPLICANT TABLE
 -- ============================================================================
-
-CREATE TABLE REQUEST (
-    request_id   INT            AUTO_INCREMENT,
-    user_id      INT            NOT NULL,
-    category_id  INT,
-    title        VARCHAR(200)   NOT NULL,
-    description  TEXT,
-    budget_max   DECIMAL(10,2),
-    status       ENUM('OPEN','FULFILLED','CLOSED') NOT NULL DEFAULT 'OPEN',
-    created_at   DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT pk_request PRIMARY KEY (request_id),
-    CONSTRAINT fk_request_user FOREIGN KEY (user_id)
-        REFERENCES `USER`(user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_request_category FOREIGN KEY (category_id)
-        REFERENCES CATEGORY(category_id) ON DELETE SET NULL,
-    CONSTRAINT chk_request_budget CHECK (budget_max IS NULL OR budget_max > 0)
-) ENGINE=InnoDB;
-
-
--- ============================================================================
--- 11. REVIEW — a buyer reviews a listing after purchase
--- ============================================================================
-
-CREATE TABLE REVIEW (
-    review_id    INT      AUTO_INCREMENT,
-    reviewer_id  INT      NOT NULL,
-    listing_id   INT      NOT NULL,
-    rating       TINYINT  NOT NULL,
-    comment      TEXT,
-    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT pk_review PRIMARY KEY (review_id),
-    CONSTRAINT fk_review_user FOREIGN KEY (reviewer_id)
-        REFERENCES `USER`(user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_review_listing FOREIGN KEY (listing_id)
-        REFERENCES LISTING(listing_id) ON DELETE CASCADE,
-    CONSTRAINT chk_review_rating CHECK (rating BETWEEN 1 AND 5),
-    CONSTRAINT uq_review_one_per_user UNIQUE (reviewer_id, listing_id)
-    -- UNIQUE on (reviewer_id, listing_id): one review per user per listing.
-    -- CHECK rating BETWEEN 1 AND 5: exactly what the project requires.
-) ENGINE=InnoDB;
-
-
--- ============================================================================
--- 12. PRICE_AUDIT — audit trail for price changes (used by Stage 6 trigger)
--- ============================================================================
-
-CREATE TABLE PRICE_AUDIT (
-    audit_id    INT            AUTO_INCREMENT,
-    listing_id  INT            NOT NULL,
-    old_price   DECIMAL(10,2)  NOT NULL,
-    new_price   DECIMAL(10,2)  NOT NULL,
-    changed_by  INT,
-    changed_at  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT pk_price_audit PRIMARY KEY (audit_id),
-    CONSTRAINT fk_audit_listing FOREIGN KEY (listing_id)
-        REFERENCES LISTING(listing_id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
-
--- ============================================================================
--- VIVA QUICK REFERENCE
--- ============================================================================
--- Q: Why InnoDB?
--- A: InnoDB supports ACID transactions, row-level locking, and foreign keys.
---    MyISAM does not support FKs or transactions.
+-- DESIGN DECISION:
+-- Represents individual borrowers registered in the banking system.
+-- Stores official Indian KYC identifiers (PAN card, Aadhaar card).
 --
--- Q: Why DECIMAL instead of FLOAT for prices?
--- A: FLOAT has rounding errors (0.1 + 0.2 ≠ 0.3). DECIMAL stores exact
---    values, which is critical for money.
+-- KEY CHOICES:
+-- - `applicant_id`: Surrogate integer primary key with AUTO_INCREMENT for
+--   efficient B-Tree index traversal and joining performance.
+-- - `email`, `pan_no`, `aadhaar_no`: Alternate candidate keys enforced via UNIQUE
+--   constraints to guarantee deduplication and one-to-one customer mapping.
+-- - `credit_score`: Enforced via CHECK constraint within the standard CIBIL/RBI
+--   bureau scoring range [300, 900].
+-- - `annual_income`: Enforced non-negative to maintain realistic financial profiles.
+-- ============================================================================
+
+CREATE TABLE `APPLICANT` (
+    `applicant_id`      INT             AUTO_INCREMENT,
+    `name`              VARCHAR(100)    NOT NULL,
+    `email`             VARCHAR(150)    NOT NULL,
+    `phone`             VARCHAR(15)     NOT NULL,
+    `address`           TEXT            NOT NULL,
+    `dob`               DATE            NOT NULL,
+    `pan_no`            VARCHAR(10)     NOT NULL,
+    `aadhaar_no`        VARCHAR(12)     NOT NULL,
+    `annual_income`     DECIMAL(12, 2)  NOT NULL,
+    `credit_score`      INT             NOT NULL,
+    `employment_type`   ENUM('SALARIED', 'SELF_EMPLOYED', 'BUSINESS', 'RETIRED', 'STUDENT') NOT NULL,
+    `employer_name`     VARCHAR(150)    DEFAULT NULL,
+    `created_at`        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    -- Primary Key Constraint
+    CONSTRAINT `pk_applicant` 
+        PRIMARY KEY (`applicant_id`),
+
+    -- Unique Identification Constraints (KYC Deduplication)
+    CONSTRAINT `uq_applicant_email` 
+        UNIQUE (`email`),
+    CONSTRAINT `uq_applicant_pan` 
+        UNIQUE (`pan_no`),
+    CONSTRAINT `uq_applicant_aadhaar` 
+        UNIQUE (`aadhaar_no`),
+
+    -- Domain & Business Rule Constraints
+    CONSTRAINT `chk_applicant_income` 
+        CHECK (`annual_income` >= 0),
+    CONSTRAINT `chk_applicant_credit_score` 
+        CHECK (`credit_score` BETWEEN 300 AND 900),
+    CONSTRAINT `chk_applicant_pan_len` 
+        CHECK (CHAR_LENGTH(`pan_no`) = 10),
+    CONSTRAINT `chk_applicant_aadhaar_len` 
+        CHECK (CHAR_LENGTH(`aadhaar_no`) = 12)
+) ENGINE=InnoDB COMMENT='Registered loan applicants and KYC financial profile';
+
+
+-- ============================================================================
+-- 2. LOAN_PRODUCT TABLE
+-- ============================================================================
+-- DESIGN DECISION:
+-- Master catalog of loan offerings (SBI-style retail and commercial schemes).
+-- Defines base interest rate, permissible borrowing limits, tenure boundaries,
+-- and fee structures.
 --
--- Q: Why ON DELETE CASCADE on some FKs and RESTRICT on others?
--- A: CASCADE removes child rows automatically (good for profiles, reviews).
---    RESTRICT prevents deletion if children exist (good for categories with
---    listings, listings with orders — we don't want to lose sales history).
+-- KEY CHOICES:
+-- - `product_type`: Categorized by standardized credit portfolios (HOME, PERSONAL,
+--   VEHICLE, EDUCATION, BUSINESS, GOLD, AGRICULTURE).
+-- - `interest_rate`: Annual base interest percentage (e.g., 8.50% p.a.). Must be > 0.
+-- - Boundary Checks: Table-level CHECK constraints verify `max_amount >= min_amount`
+--   and `max_tenure_months >= min_tenure_months` to guarantee logical interval ranges.
+-- - `processing_fee_pct` & `penalty_rate_pct`: Percentage fees capped in [0, 100].
+-- ============================================================================
+
+CREATE TABLE `LOAN_PRODUCT` (
+    `product_id`            INT             AUTO_INCREMENT,
+    `name`                  VARCHAR(100)    NOT NULL,
+    `product_type`          ENUM('HOME', 'PERSONAL', 'VEHICLE', 'EDUCATION', 'BUSINESS', 'GOLD', 'AGRICULTURE') NOT NULL,
+    `interest_rate`         DECIMAL(5, 2)   NOT NULL,
+    `min_amount`            DECIMAL(12, 2)  NOT NULL,
+    `max_amount`            DECIMAL(12, 2)  NOT NULL,
+    `min_tenure_months`     INT             NOT NULL,
+    `max_tenure_months`     INT             NOT NULL,
+    `processing_fee_pct`    DECIMAL(4, 2)   NOT NULL DEFAULT 0.00,
+    `penalty_rate_pct`      DECIMAL(4, 2)   NOT NULL DEFAULT 0.00,
+    `description`           TEXT            DEFAULT NULL,
+
+    -- Primary Key Constraint
+    CONSTRAINT `pk_loan_product` 
+        PRIMARY KEY (`product_id`),
+
+    -- Domain & Range Validation Constraints
+    CONSTRAINT `chk_lp_interest_rate` 
+        CHECK (`interest_rate` > 0),
+    CONSTRAINT `chk_lp_min_amount` 
+        CHECK (`min_amount` > 0),
+    CONSTRAINT `chk_lp_amount_range` 
+        CHECK (`max_amount` >= `min_amount`),
+    CONSTRAINT `chk_lp_min_tenure` 
+        CHECK (`min_tenure_months` > 0),
+    CONSTRAINT `chk_lp_tenure_range` 
+        CHECK (`max_tenure_months` >= `min_tenure_months`),
+    CONSTRAINT `chk_lp_processing_fee` 
+        CHECK (`processing_fee_pct` >= 0 AND `processing_fee_pct` <= 100),
+    CONSTRAINT `chk_lp_penalty_rate` 
+        CHECK (`penalty_rate_pct` >= 0 AND `penalty_rate_pct` <= 100)
+) ENGINE=InnoDB COMMENT='Loan catalog defining terms, interest rates, and tenure limits';
+
+
+-- ============================================================================
+-- 3. GUARANTOR TABLE
+-- ============================================================================
+-- DESIGN DECISION:
+-- Co-signers or financial guarantors who provide secondary repayment security.
+-- Often mandatory for high-value loans (Education, High-Ticket Personal, Business).
 --
--- Q: How is this different from Oracle?
--- A: AUTO_INCREMENT → Oracle uses SEQUENCE + TRIGGER or IDENTITY (12c+).
---    ENUM → Oracle uses CHECK with IN(...).
---    VARCHAR → Oracle uses VARCHAR2.
---    DATETIME → Oracle uses TIMESTAMP or DATE (which includes time).
+-- KEY CHOICES:
+-- - `guarantor_id`: Surrogate primary key.
+-- - `pan_no`: Standard 10-character PAN string for tax/KYC tracking.
+-- - `annual_income`: Must be >= 0 to assess guarantor creditworthiness.
+-- - `relationship`: Qualitative bond to the applicant (e.g., FATHER, SPOUSE, FRIEND).
+-- ============================================================================
+
+CREATE TABLE `GUARANTOR` (
+    `guarantor_id`      INT             AUTO_INCREMENT,
+    `name`              VARCHAR(100)    NOT NULL,
+    `phone`             VARCHAR(15)     NOT NULL,
+    `pan_no`            VARCHAR(10)     NOT NULL,
+    `relationship`      VARCHAR(50)     NOT NULL,
+    `annual_income`     DECIMAL(12, 2)  NOT NULL,
+    `address`           TEXT            NOT NULL,
+
+    -- Primary Key Constraint
+    CONSTRAINT `pk_guarantor` 
+        PRIMARY KEY (`guarantor_id`),
+
+    -- Domain Constraints
+    CONSTRAINT `chk_guarantor_income` 
+        CHECK (`annual_income` >= 0),
+    CONSTRAINT `chk_guarantor_pan_len` 
+        CHECK (CHAR_LENGTH(`pan_no`) = 10)
+) ENGINE=InnoDB COMMENT='Guarantors co-signing loan obligations';
+
+
+-- ============================================================================
+-- 4. LOAN TABLE
+-- ============================================================================
+-- DESIGN DECISION:
+-- Core transactional entity connecting APPLICANT, LOAN_PRODUCT, and optional
+-- GUARANTOR. Captures the sanctioned loan contract terms and lifecycle state.
+--
+-- REFERENTIAL INTEGRITY ACTIONS:
+-- - `ON DELETE RESTRICT` for `APPLICANT`: Prevents accidental deletion of a customer
+--   who has an existing loan contract. Safeguards banking audit records.
+-- - `ON DELETE RESTRICT` for `LOAN_PRODUCT`: Disallows deletion of active product
+--   categories that have live or historical loan commitments.
+-- - `ON DELETE SET NULL` for `GUARANTOR`: If a guarantor profile is removed or
+--   unlinked, the loan contract remains valid with guarantor_id set to NULL.
+--
+-- FINANCIAL SANITY CONSTRAINTS:
+-- - `principal_amount > 0`
+-- - `interest_rate > 0`
+-- - `tenure_months > 0`
+-- - `emi_amount > 0`
+-- - `total_payable >= principal_amount` (Guarantees interest cannot be negative).
+-- ============================================================================
+
+CREATE TABLE `LOAN` (
+    `loan_id`           INT             AUTO_INCREMENT,
+    `applicant_id`      INT             NOT NULL,
+    `product_id`        INT             NOT NULL,
+    `guarantor_id`      INT             DEFAULT NULL,
+    `principal_amount`  DECIMAL(12, 2)  NOT NULL,
+    `interest_rate`     DECIMAL(5, 2)   NOT NULL,
+    `tenure_months`     INT             NOT NULL,
+    `emi_amount`        DECIMAL(10, 2)  NOT NULL,
+    `total_payable`     DECIMAL(12, 2)  NOT NULL,
+    `disbursement_date` DATE            DEFAULT NULL,
+    `maturity_date`     DATE            DEFAULT NULL,
+    `status`            ENUM('PENDING', 'APPROVED', 'ACTIVE', 'CLOSED', 'DEFAULTED', 'REJECTED') NOT NULL DEFAULT 'PENDING',
+    `approved_by`       VARCHAR(100)    DEFAULT NULL,
+    `remarks`           TEXT            DEFAULT NULL,
+    `created_at`        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    -- Primary Key Constraint
+    CONSTRAINT `pk_loan` 
+        PRIMARY KEY (`loan_id`),
+
+    -- Foreign Key Constraints & Referential Actions
+    CONSTRAINT `fk_loan_applicant` 
+        FOREIGN KEY (`applicant_id`) 
+        REFERENCES `APPLICANT`(`applicant_id`) 
+        ON DELETE RESTRICT 
+        ON UPDATE CASCADE,
+
+    CONSTRAINT `fk_loan_product` 
+        FOREIGN KEY (`product_id`) 
+        REFERENCES `LOAN_PRODUCT`(`product_id`) 
+        ON DELETE RESTRICT 
+        ON UPDATE CASCADE,
+
+    CONSTRAINT `fk_loan_guarantor` 
+        FOREIGN KEY (`guarantor_id`) 
+        REFERENCES `GUARANTOR`(`guarantor_id`) 
+        ON DELETE SET NULL 
+        ON UPDATE CASCADE,
+
+    -- Financial Integrity Constraints
+    CONSTRAINT `chk_loan_principal` 
+        CHECK (`principal_amount` > 0),
+    CONSTRAINT `chk_loan_interest` 
+        CHECK (`interest_rate` > 0),
+    CONSTRAINT `chk_loan_tenure` 
+        CHECK (`tenure_months` > 0),
+    CONSTRAINT `chk_loan_emi` 
+        CHECK (`emi_amount` > 0),
+    CONSTRAINT `chk_loan_total_payable` 
+        CHECK (`total_payable` >= `principal_amount`)
+) ENGINE=InnoDB COMMENT='Sanctioned loan contracts and lifecycle states';
+
+
+-- ============================================================================
+-- 5. EMI_SCHEDULE TABLE
+-- ============================================================================
+-- DESIGN DECISION:
+-- Amortization schedule generated upon loan sanctioning or disbursement.
+-- Breaks down each monthly installment into principal component and interest
+-- component using standard reducing balance amortization.
+--
+-- EMI FORMULA:
+--   EMI = P * r * (1 + r)^n / ((1 + r)^n - 1)
+--   where P = principal_amount, r = monthly interest rate (annual / 12 / 100),
+--         n = tenure_months.
+--
+-- KEY INTEGRITY RULES:
+-- - `UNIQUE(loan_id, installment_no)`: Prevents duplicate installment sequence
+--   numbers for the same loan contract.
+-- - `ON DELETE CASCADE` from `LOAN`: If a loan application is dropped or cleaned
+--   up prior to booking, its associated calculated schedule is purged atomically.
+-- - `balance_after >= 0`: The remaining principal balance can never be negative.
+-- ============================================================================
+
+CREATE TABLE `EMI_SCHEDULE` (
+    `emi_id`                INT             AUTO_INCREMENT,
+    `loan_id`               INT             NOT NULL,
+    `installment_no`        INT             NOT NULL,
+    `due_date`              DATE            NOT NULL,
+    `principal_component`   DECIMAL(10, 2)  NOT NULL,
+    `interest_component`    DECIMAL(10, 2)  NOT NULL,
+    `emi_amount`            DECIMAL(10, 2)  NOT NULL,
+    `balance_after`         DECIMAL(12, 2)  NOT NULL,
+    `status`                ENUM('PENDING', 'PAID', 'OVERDUE', 'PARTIALLY_PAID') NOT NULL DEFAULT 'PENDING',
+    `paid_date`             DATE            DEFAULT NULL,
+    `penalty_amount`        DECIMAL(10, 2)  NOT NULL DEFAULT 0.00,
+
+    -- Primary Key Constraint
+    CONSTRAINT `pk_emi_schedule` 
+        PRIMARY KEY (`emi_id`),
+
+    -- Composite Uniqueness: One unique installment sequence per loan
+    CONSTRAINT `uq_loan_installment` 
+        UNIQUE (`loan_id`, `installment_no`),
+
+    -- Foreign Key Constraint & Referential Action
+    CONSTRAINT `fk_emi_loan` 
+        FOREIGN KEY (`loan_id`) 
+        REFERENCES `LOAN`(`loan_id`) 
+        ON DELETE CASCADE 
+        ON UPDATE CASCADE,
+
+    -- Integrity & Non-negativity Constraints
+    CONSTRAINT `chk_emi_installment_no` 
+        CHECK (`installment_no` > 0),
+    CONSTRAINT `chk_emi_principal` 
+        CHECK (`principal_component` >= 0),
+    CONSTRAINT `chk_emi_interest` 
+        CHECK (`interest_component` >= 0),
+    CONSTRAINT `chk_emi_amount` 
+        CHECK (`emi_amount` > 0),
+    CONSTRAINT `chk_emi_balance` 
+        CHECK (`balance_after` >= 0),
+    CONSTRAINT `chk_emi_penalty` 
+        CHECK (`penalty_amount` >= 0)
+) ENGINE=InnoDB COMMENT='Monthly installment breakdown and amortization schedule';
+
+
+-- ============================================================================
+-- 6. REPAYMENT TABLE
+-- ============================================================================
+-- DESIGN DECISION:
+-- Records actual monetary transactions made by borrowers against specific EMIs.
+--
+-- KEY INTEGRITY RULES:
+-- - `transaction_ref UNIQUE`: Prevents replay attacks and double-crediting
+--   by enforcing global uniqueness of payment gateway / bank UTR references.
+-- - `amount_paid CHECK (> 0)`: Every recorded payment must represent a positive cashflow.
+-- - `late_fee CHECK (>= 0)`: Accrued delay penalty assessed during overdue clearance.
+-- - `ON DELETE RESTRICT` on `emi_id` and `loan_id`: Under RBI banking compliance,
+--   financial transaction records must never be deleted while parent loan/EMI
+--   records exist. Maintains an unassailable financial ledger.
+-- ============================================================================
+
+CREATE TABLE `REPAYMENT` (
+    `repayment_id`      INT             AUTO_INCREMENT,
+    `emi_id`            INT             NOT NULL,
+    `loan_id`           INT             NOT NULL,
+    `amount_paid`       DECIMAL(10, 2)  NOT NULL,
+    `payment_date`      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `payment_mode`      ENUM('CASH', 'CHEQUE', 'NEFT', 'UPI', 'AUTO_DEBIT') NOT NULL,
+    `transaction_ref`   VARCHAR(100)    NOT NULL,
+    `late_fee`          DECIMAL(10, 2)  NOT NULL DEFAULT 0.00,
+    `remarks`           VARCHAR(255)    DEFAULT NULL,
+
+    -- Primary Key Constraint
+    CONSTRAINT `pk_repayment` 
+        PRIMARY KEY (`repayment_id`),
+
+    -- Unique Financial Transaction Reference
+    CONSTRAINT `uq_repayment_txn` 
+        UNIQUE (`transaction_ref`),
+
+    -- Foreign Key Constraints & Strict Retention Referential Actions
+    CONSTRAINT `fk_repayment_emi` 
+        FOREIGN KEY (`emi_id`) 
+        REFERENCES `EMI_SCHEDULE`(`emi_id`) 
+        ON DELETE RESTRICT 
+        ON UPDATE CASCADE,
+
+    CONSTRAINT `fk_repayment_loan` 
+        FOREIGN KEY (`loan_id`) 
+        REFERENCES `LOAN`(`loan_id`) 
+        ON DELETE RESTRICT 
+        ON UPDATE CASCADE,
+
+    -- Financial Range Validations
+    CONSTRAINT `chk_repayment_amount` 
+        CHECK (`amount_paid` > 0),
+    CONSTRAINT `chk_repayment_late_fee` 
+        CHECK (`late_fee` >= 0)
+) ENGINE=InnoDB COMMENT='Real-time repayment transactions and settlement ledger';
+
+
+-- ============================================================================
+-- 7. DEFAULT_LOG TABLE
+-- ============================================================================
+-- DESIGN DECISION:
+-- Tracks Non-Performing Assets (NPAs) and persistent payment defaults.
+-- In Indian banking regulations (RBI guidelines), an account overdue for > 90 days
+-- transitions into an NPA.
+--
+-- KEY ATTRIBUTES:
+-- - `months_overdue`: Number of consecutive overdue cycles (CHECK >= 1).
+-- - `action_taken`: Formal bank recovery stage (NOTICE_SENT, LEGAL_ACTION,
+--   RECOVERY_AGENT, WRITE_OFF, RESTRUCTURED).
+-- - `resolved`: Boolean flag indicating whether default has been cured/settled.
+-- - `ON DELETE RESTRICT`: Default history cannot be purged if the loan entity exists.
+-- ============================================================================
+
+CREATE TABLE `DEFAULT_LOG` (
+    `default_id`            INT             AUTO_INCREMENT,
+    `loan_id`               INT             NOT NULL,
+    `default_date`          DATE            NOT NULL,
+    `outstanding_amount`    DECIMAL(12, 2)  NOT NULL,
+    `months_overdue`        INT             NOT NULL,
+    `action_taken`          ENUM('NOTICE_SENT', 'LEGAL_ACTION', 'RECOVERY_AGENT', 'WRITE_OFF', 'RESTRUCTURED') NOT NULL DEFAULT 'NOTICE_SENT',
+    `resolved`              BOOLEAN         NOT NULL DEFAULT FALSE,
+    `resolution_date`       DATE            DEFAULT NULL,
+    `remarks`               TEXT            DEFAULT NULL,
+
+    -- Primary Key Constraint
+    CONSTRAINT `pk_default_log` 
+        PRIMARY KEY (`default_id`),
+
+    -- Foreign Key Constraint
+    CONSTRAINT `fk_default_loan` 
+        FOREIGN KEY (`loan_id`) 
+        REFERENCES `LOAN`(`loan_id`) 
+        ON DELETE RESTRICT 
+        ON UPDATE CASCADE,
+
+    -- Domain Validations
+    CONSTRAINT `chk_default_outstanding` 
+        CHECK (`outstanding_amount` >= 0),
+    CONSTRAINT `chk_default_months` 
+        CHECK (`months_overdue` >= 1)
+) ENGINE=InnoDB COMMENT='NPA monitoring and default escalation log';
+
+
+-- ============================================================================
+-- 8. LOAN_AUDIT TABLE
+-- ============================================================================
+-- DESIGN DECISION:
+-- Immutable audit log capturing all state transitions, approvals, disbursements,
+-- and interest rate adjustments made to loans.
+--
+-- KEY ATTRIBUTES:
+-- - `field_changed`: The column or parameter modified (e.g., 'status', 'interest_rate').
+-- - `old_value` / `new_value`: Historical before-and-after values for forensic analysis.
+-- - `changed_at`: Timestamp automatically recorded upon change.
+-- - `changed_by`: User or system actor triggering the change (DEFAULT 'SYSTEM').
+-- - `ON DELETE CASCADE`: If a loan application is pruned during testing or staging,
+--   its associated audit entries are removed in tandem.
+-- ============================================================================
+
+CREATE TABLE `LOAN_AUDIT` (
+    `audit_id`          INT             AUTO_INCREMENT,
+    `loan_id`           INT             NOT NULL,
+    `field_changed`     VARCHAR(50)     NOT NULL,
+    `old_value`         TEXT            DEFAULT NULL,
+    `new_value`         TEXT            DEFAULT NULL,
+    `changed_at`        TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `changed_by`        VARCHAR(100)    NOT NULL DEFAULT 'SYSTEM',
+
+    -- Primary Key Constraint
+    CONSTRAINT `pk_loan_audit` 
+        PRIMARY KEY (`audit_id`),
+
+    -- Foreign Key Constraint
+    CONSTRAINT `fk_audit_loan` 
+        FOREIGN KEY (`loan_id`) 
+        REFERENCES `LOAN`(`loan_id`) 
+        ON DELETE CASCADE 
+        ON UPDATE CASCADE
+) ENGINE=InnoDB COMMENT='Audit trail capturing loan modifications and state transitions';
+
+-- ============================================================================
+-- SCHEMA CREATION COMPLETE
+-- All 8 tables successfully defined with InnoDB, Primary Keys, Foreign Keys,
+-- CHECK constraints, and UNIQUE constraints.
 -- ============================================================================

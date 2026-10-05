@@ -60,7 +60,7 @@
     }
 
     \textbf{\large A Course End Project Report on} \\[0.4cm]
-    {\LARGE \textbf{CampusSwap: Design and Implementation of an ACID-Compliant Relational Database Management System for Campus Marketplaces}}\\[1.2cm]
+    {\LARGE \textbf{Development of a Bank Loan Management System: EMI Processing, Repayment Tracking, and Risk Assessment}}\\[1.2cm]
     
     {\Large \textbf{A9511 - Database Management Systems}}\\[1.2cm]
     
@@ -99,26 +99,35 @@
 
 \section{Problem Definition and Context}
 
-\subsection{Campus Marketplace Data Fragmentation and Commerce Challenges}
-Within higher education institutions, students systematically acquire, utilize, and dispose of significant volumes of physical academic resources, including reference textbooks, engineering calculators, lab kits, drawing instruments, and hostel gear. At the conclusion of each academic semester, senior students seek to liquidate these reusable assets, while incoming cohorts require affordable access to the exact same inventory. 
+\subsection{Banking Credit Lifecycle Challenges and Manual Processing Bottlenecks}
+In modern commercial banking institutions (such as the State Bank of India and nationalized retail lending institutions), managing credit portfolios is a mission-critical, operationally complex endeavor. The retail lending lifecycle encompasses applicant onboarding, creditworthiness appraisal, loan sanctioning, disbursement, monthly Equated Monthly Installment (EMI) generation, ongoing repayment accounting, late-fee assessment, and default classification.
 
-Presently, this peer-to-peer exchange relies on unorganized, ad-hoc digital communication channels such as WhatsApp groups, Telegram channels, and physical notice boards. These channels suffer from acute operational and data engineering shortcomings:
+Despite advances in consumer-facing financial technology, several enterprise lending systems and branch-level ledger workflows suffer from significant systemic challenges:
 \begin{itemize}
-    \item \textbf{Absence of ACID Transaction Guarantees:} Concurrent buyer requests on solitary items trigger race conditions and double-allocation anomalies, leading to student disputes.
-    \item \textbf{Data Redundancy and Anomaly Vulnerability:} Unstructured item advertisements result in severe insertion, update, and deletion anomalies, with historical price records frequently lost.
-    \item \textbf{Lack of Structured Integrity and Constraints:} Missing domain validations allow invalid pricing, negative quantities, unverified seller reputations, and orphaned product categories.
-    \item \textbf{Suboptimal Retrieval and Search Bottlenecks:} Text-based matching without structured hierarchical indexing incurs high search latencies and excessive compute overheads.
+    \item \textbf{Manual and Fragmented Amortization Processing:} Calculating monthly EMI values, tracking shifting principal-interest splits across reducing balances, and adjusting amortization schedules following pre-payments are frequently performed across disjointed spreadsheets or legacy sub-systems, leading to mathematical discrepancies and rounding errors.
+    \item \textbf{Repayment Tracking and Ledger Reconciliation Difficulties:} Multi-channel repayments (Cash, Cheque, NEFT, UPI, Auto-Debit) require atomic synchronization against designated monthly schedules. In the absence of strict transactional consistency, payments are misallocated or double-credited.
+    \item \textbf{Inability to Detect Defaults and NPAs Early:} Under Reserve Bank of India (RBI) prudential norms, loans overdue past 90 consecutive days must be classified as Non-Performing Assets (NPAs). Unsynchronized, batch-delayed ledgers fail to trigger timely delinquency alerts, allowing credit risk exposure to escalate unchecked.
+    \item \textbf{Portfolio Risk Assessment Complexity:} Evaluating systemic exposure across diverse collateral types, interest regimes, and borrower employment demographics requires complex analytical aggregations that traditional flat files cannot support efficiently.
 \end{itemize}
 
-\textbf{CampusSwap} addresses these engineering challenges by establishing a normalized, highly concurrent, and integrity-constrained Relational Database Management System (RDBMS) tailored to the localized campus environment.
+\subsection{Core Database Engineering Deficiencies in Legacy Loan Processing}
+A rigorous analysis of legacy banking architectures reveals fundamental relational and concurrency flaws:
+\begin{enumerate}
+    \item \textbf{Absence of ACID Guarantees in Manual Ledgers:} Concurrent payment postings (e.g., automated recurring ECS clearing coinciding with counter UPI payments) trigger race conditions, phantom updates, and inconsistent customer balances unless protected by strict transactional boundaries and row-level locking.
+    \item \textbf{Data Redundancy in Loan and Customer Records:} Denormalized schemas duplicate applicant demographic details, employment credentials, and product terms across every monthly installment row, introducing severe update, insertion, and deletion anomalies.
+    \item \textbf{Lack of Automated Overdue Detection and Active Enforcement:} Without database-level event triggers and transactional cursor routines, overdue status transitions depend on error-prone human intervention or arbitrary external scripts.
+    \item \textbf{Missing Multi-Level Domain and Referential Integrity:} Missing domain checks permit negative incomes, out-of-range credit scores ($<300$ or $>900$), loan tenure bounds violations, or orphaned repayment transactions.
+\end{enumerate}
+
+To rectify these operational and technological vulnerabilities, the \textbf{Bank Loan Management System (BLMS)} is architected as an ACID-compliant, highly concurrent, normalized Relational Database Management System implemented on MySQL 8.0 with the InnoDB storage engine.
 
 \subsection{Relevance to Sustainable Development Goals (SDGs)}
-The engineering architecture of CampusSwap directly aligns with multiple United Nations Sustainable Development Goals:
+The engineering design of the Bank Loan Management System aligns directly with United Nations Sustainable Development Goals:
 \begin{itemize}
-    \item \textbf{SDG 12 (Responsible Consumption and Production):} Fosters an on-campus circular economy by maximizing the operational lifecycle of textbooks and equipment, directly curbing paper waste and electronic obsolescence.
-    \item \textbf{SDG 4 (Quality Education):} Democratizes access to high-cost academic resources for socio-economically diverse student demographics by reducing material acquisition costs by up to 70\%.
-    \item \textbf{SDG 9 (Industry, Innovation, and Infrastructure):} Deploys a robust, fault-tolerant transactional database architecture demonstrating scalable transactional patterns and ACID compliance.
-    \item \textbf{SDG 13 (Climate Action):} Reduces institutional carbon footprints associated with the repeated manufacturing, binding, packaging, and logistics of physical course textbooks.
+    \item \textbf{SDG 1 (No Poverty):} Expands transparent financial inclusion and micro-credit access for underserved, salaried, and agricultural borrowers by automating risk evaluations and reducing institutional overheads.
+    \item \textbf{SDG 8 (Decent Work and Economic Growth):} Enhances institutional banking resilience, enforces prudent capital management, and stabilizes national credit flows through dependable liquidity tracking.
+    \item \textbf{SDG 9 (Industry, Innovation, and Infrastructure):} Deploys a robust, fault-tolerant transactional database architecture demonstrating scalable transactional patterns, indexed retrieval, and automated event triggers.
+    \item \textbf{SDG 16 (Peace, Justice, and Strong Institutions):} Fosters institutional integrity, eliminates predatory lending discrepancies, and guarantees auditable accountability via immutable system-level audit logging.
 \end{itemize}
 
 % ------------------ Section 2: Problem Analysis ------------------
@@ -126,131 +135,228 @@ The engineering architecture of CampusSwap directly aligns with multiple United 
 \section{Problem Analysis and Solution Development}
 
 \subsection{Characterization of Complex Database Engineering Phenomena}
-Designing a localized campus marketplace demands solving several intricate data modeling and concurrency phenomena:
+Architecting an enterprise-grade credit management system entails addressing intricate data modeling, concurrency, and financial engineering phenomena:
 \begin{enumerate}
-    \item \textbf{Overlapping Partial Specialization:} A student represented by the supertype entity \texttt{USER} can simultaneously act as a \texttt{SELLER} (liquidating items) and a \texttt{BUYER} (procuring items), while certain users may browse without engaging in transactions. Modeling this relationship without introducing sparse columns or null-heavy schemas requires rigorous relational subtyping.
-    \item \textbf{Self-Referential Category Hierarchies:} Academic merchandise spans recursive categorical structures (e.g., \textit{Books $\rightarrow$ Engineering $\rightarrow$ CSE $\rightarrow$ Core Textbooks}). The schema must maintain self-referencing foreign keys that gracefully handle sub-category cascades and reclassifications.
-    \item \textbf{Inventory Depletion Concurrency Anomalies:} When inventory reaches a unit quantity ($qty = 1$), concurrent checkout attempts by competing transactions create hazardous race conditions. Without row-level exclusive locks (\texttt{SELECT ... FOR UPDATE}), lost updates and negative stock anomalies compromise database consistency.
-    \item \textbf{Active Business Rule Enforcement:} Maintaining running seller reputation aggregates and price modification audit trails within application logic introduces race hazards; these must be delegated to the database engine via active event-driven triggers.
+    \item \textbf{Amortization Schedule Generation via Reducing Balance Method:} Generating a multi-year installment schedule requires computing monthly principal and interest splits dynamically. Each row's interest component depends strictly on the preceding installment's terminal balance ($I_k = B_{k-1} \cdot r$), requiring procedural iterative generation within an atomic database transaction.
+    \item \textbf{Multi-Party Relational Dependencies:} A loan contract synthesizes multi-entity associations: exactly one primary \texttt{APPLICANT}, a defined \texttt{LOAN\_PRODUCT} governing interest and tenure boundaries, and an optional third-party \texttt{GUARANTOR}. Ensuring referential integrity while permitting nullable guarantor linkages demands rigorous foreign key modeling.
+    \item \textbf{Repayment Concurrency and Race Hazards:} When multiple repayment requests arrive concurrently for the same installment, uncoordinated reads produce lost updates (e.g., double-crediting a single payment or failing to register late fees). Exclusive row-level locking (\texttt{SELECT ... FOR UPDATE}) under Two-Phase Locking (2PL) is essential to preserve ACID properties.
+    \item \textbf{Cascading Delinquency and Default Detection:} Under RBI guidelines, consecutive overdue installments must trigger automated state transitions. When overdue duration exceeds regulatory thresholds, the system must autonomously flag the loan as \texttt{'DEFAULTED'} and generate audit logs without manual operator intervention.
 \end{enumerate}
 
 \subsection{Engineering Knowledge Applied}
-The architecture integrates foundational principles across database theory, relational calculus, and systems programming:
+The design and implementation of BLMS synthesizes foundational principles across database theory, transactional systems, and financial computing:
 \begin{itemize}
-    \item \textbf{Relational Algebra and Calculus:} Formalized expression of queries using selection ($\sigma$), projection ($\pi$), equijoin ($\bowtie$), aggregate grouping ($\gamma$), rename ($\rho$), and set operators.
-    \item \textbf{Normalization Theory (1NF to BCNF):} Functional dependency analysis, attribute closure derivation, and lossless-join, dependency-preserving decomposition.
-    \item \textbf{Storage and Index Structures:} Implementation of balanced multi-way search trees (B+ Trees), composite indexing, and the leftmost-prefix evaluation rule.
-    \item \textbf{Transaction Management and Concurrency Control:} Strict Two-Phase Locking (2PL), ACID transaction boundaries, deadlocks characterization, and isolation guarantees.
-    \item \textbf{Active Database Mechanics:} Execution-phase event triggers (\texttt{BEFORE}/\texttt{AFTER UPDATE}, \texttt{AFTER INSERT}) and procedural cursor constructs.
+    \item \textbf{Relational Algebra and Calculus:} Formalized specification of credit queries using selection ($\sigma$), projection ($\pi$), equijoin ($\bowtie$), aggregate grouping ($\gamma$), and set difference ($-$).
+    \item \textbf{Normalization Theory (1NF to BCNF):} Systematic elimination of partial and transitive dependencies using functional dependency analysis and attribute closure computations.
+    \item \textbf{Storage and Index Structures:} Mathematical modeling of balanced multi-way B+ Tree search structures, composite index sizing, and leftmost-prefix index pruning.
+    \item \textbf{Transaction Management and Concurrency Control:} Implementation of ACID boundaries, Two-Phase Locking (2PL), serializability safeguards, and automated exception rollbacks.
+    \item \textbf{Active Database Mechanics:} Execution-phase event triggers (\texttt{AFTER UPDATE}, \texttt{AFTER INSERT}) and procedural batch cursors.
 \end{itemize}
 
 \subsection{Mathematical and Theoretical Analysis}
 
+\subsubsection{Mathematical Derivation of Equated Monthly Installment (EMI)}
+Let the principal loan sanction amount be $P \in \mathbb{R}^+$. Let $R$ denote the annual nominal interest rate in percent. The effective periodic monthly interest rate $r$ is given by:
+\begin{equation}
+    r = \frac{R}{12 \times 100}
+\end{equation}
+Let $n \in \mathbb{N}^+$ denote the total loan tenure in months. Under the reducing balance amortization methodology, a constant installment $E$ (the EMI) is paid at the conclusion of each month $k \in \{1, 2, \dots, n\}$.
+
+Let $B_k$ represent the outstanding principal balance immediately following the $k$-th payment. At initial disbursement ($k=0$):
+\begin{equation}
+    B_0 = P
+\end{equation}
+For the first installment ($k=1$):
+\begin{align*}
+    \text{Interest Accrued: } I_1 &= B_0 \cdot r = P \cdot r \\
+    \text{Principal Repaid: } \Delta P_1 &= E - I_1 = E - P \cdot r \\
+    \text{Outstanding Balance: } B_1 &= B_0 - \Delta P_1 = P - (E - P \cdot r) = P(1+r) - E
+\end{align*}
+For the second installment ($k=2$):
+\begin{align*}
+    B_2 &= B_1(1+r) - E = [P(1+r) - E](1+r) - E = P(1+r)^2 - E(1+r) - E
+\end{align*}
+By mathematical induction, the outstanding balance $B_k$ at arbitrary month $k$ is formulated as:
+\begin{align}
+    B_k &= P(1+r)^k - E \sum_{t=0}^{k-1} (1+r)^t
+\end{align}
+Recognizing the geometric progression $\sum_{t=0}^{k-1} (1+r)^t$ with common ratio $(1+r) \ne 1$:
+\begin{equation}
+    \sum_{t=0}^{k-1} (1+r)^t = \frac{(1+r)^k - 1}{(1+r) - 1} = \frac{(1+r)^k - 1}{r}
+\end{equation}
+Substituting Equation (2.4) into Equation (2.3) for $k = n$:
+\begin{equation}
+    B_n = P(1+r)^n - E \left[ \frac{(1+r)^n - 1}{r} \right]
+\end{equation}
+By contractual definition of loan amortization, the terminal boundary condition requires the debt to be fully extinguished upon the final installment:
+\begin{equation}
+    B_n = 0
+\end{equation}
+Setting Equation (2.5) to zero and solving algebraically for $E$:
+\begin{align}
+    P(1+r)^n - E \left[ \frac{(1+r)^n - 1}{r} \right] &= 0 \nonumber \\
+    E \left[ \frac{(1+r)^n - 1}{r} \right] &= P(1+r)^n \nonumber \\
+    E &= \frac{P \cdot r \cdot (1+r)^n}{(1+r)^n - 1}
+\end{align}
+Equation (2.7) provides the exact mathematical formulation encoded within the BLMS stored procedure \texttt{sp\_generate\_emi\_schedule()}. For each installment $k$, the database calculates:
+\begin{align}
+    I_k &= B_{k-1} \cdot r \\
+    P_k &= E - I_k \\
+    B_k &= B_{k-1} - P_k
+\end{align}
+with the terminal installment adjusted for fractional rounding to ensure $B_n \equiv 0.00$.
+
 \subsubsection{Relational Algebra Formulations}
-To ensure rigorous algebraic tractability, core operations are mathematically formalized:
+To demonstrate mathematical tractability, key business operations are formalized in relational algebra:
 
-\paragraph{1. Top 5 Revenue-Generating Sellers:}
-$$\rho_{(\text{seller\_name, total\_revenue}) \leftarrow (u.name, R)} \left( \pi_{u.name, \sum(oi.qty \cdot oi.price)} \left( \gamma_{s.seller\_id, u.name; \sum(oi.quantity \cdot oi.price\_at\_purchase) \rightarrow R} \left( USER \bowtie_{user\_id = seller\_id} SELLER \bowtie LISTING \bowtie ORDER\_ITEM \right) \right) \right)$$
+\paragraph{1. Overdue Installments with Borrower Exposure:}
+Retrieves all installments in \texttt{'PENDING'} status past their payment deadline, joining with loan and applicant entities:
+\begin{equation*}
+    \pi_{\text{loan\_id, name, phone, emi\_amount, due\_date, penalty\_amount}} \left( 
+        \sigma_{\text{status} = \text{'PENDING'} \,\land\, \text{due\_date} < \text{CURRENT\_DATE}} (\text{EMI\_SCHEDULE}) 
+        \bowtie_{\text{loan\_id}} \text{LOAN} 
+        \bowtie_{\text{applicant\_id}} \text{APPLICANT} 
+    \right)
+\end{equation*}
 
-\paragraph{2. Listings Priced Below Respective Category Mean (Correlated Selection):}
-$$\sigma_{price < \overline{P}} \left( LISTING \bowtie_{category\_id} \left( \rho_{(category\_id, \overline{P}) \leftarrow (category\_id, AVG(price))} \left( \gamma_{category\_id; AVG(price) \rightarrow \overline{P}} (LISTING) \right) \right) \right)$$
+\paragraph{2. Aggregated Default Risk Exposure by Enforcement Action:}
+Computes default counts and aggregate outstanding exposure grouped by legal action taken:
+\begin{equation*}
+    \gamma_{\text{action\_taken};\, \text{COUNT}(\text{loan\_id}) \rightarrow N_{\text{defaults}},\, \sum(\text{outstanding\_amount}) \rightarrow S_{\text{exposure}}} \left( 
+        \text{DEFAULT\_LOG} \bowtie_{\text{loan\_id}} \sigma_{\text{status} = \text{'DEFAULTED'}} (\text{LOAN}) 
+    \right)
+\end{equation*}
 
-\paragraph{3. Buyers with Zero Order History (Set Difference):}
-$$\pi_{name, email}(USER) - \pi_{name, email}(USER \bowtie_{user\_id = buyer\_id} BUYER \bowtie_{buyer\_id = buyer\_id} ORDERS)$$
+\paragraph{3. Creditworthy Applicants with Zero Loan History (Set Difference):}
+Identifies onboarded applicants with prime credit scores ($>750$) who have never initiated a loan application:
+\begin{equation*}
+    \pi_{\text{applicant\_id, name, pan\_no, credit\_score}} \left( \sigma_{\text{credit\_score} \ge 750}(\text{APPLICANT}) \right) 
+    - \pi_{\text{applicant\_id, name, pan\_no, credit\_score}} \left( \text{APPLICANT} \bowtie_{\text{applicant\_id}} \text{LOAN} \right)
+\end{equation*}
 
-\subsubsection{Functional Dependency and Attribute Closure Derivation}
-Consider the unnormalized flat relation $ORDER\_RAW$ containing attributes:
-$$\mathcal{U} = \{\text{order\_id, buyer\_email, buyer\_name, item\_name, item\_price, item\_qty, seller\_name, seller\_upi}\}$$
-
-Subject to the set of functional dependencies $\mathcal{F}$:
+\subsubsection{Functional Dependency Analysis and Attribute Closure Derivation}
+Consider an unnormalized universal relation $LOAN\_RAW$ representing credit servicing data:
 \begin{align*}
-    FD_1: &\quad order\_id \rightarrow \{buyer\_email, buyer\_name\} \\
-    FD_2: &\quad buyer\_email \rightarrow \{buyer\_name\} \\
-    FD_3: &\quad \{order\_id, item\_name\} \rightarrow \{item\_price, item\_qty, seller\_name, seller\_upi\} \\
-    FD_4: &\quad seller\_name \rightarrow \{seller\_upi\}
+    \mathcal{U} = \{ &\text{loan\_id, installment\_no, applicant\_id, pan\_no, annual\_income, credit\_score,} \\
+    &\text{product\_id, product\_name, interest\_rate, principal\_amount, tenure\_months,} \\
+    &\text{emi\_amount, due\_date, balance\_after, guarantor\_id, guarantor\_pan} \}
+\end{align*}
+Subject to the empirical functional dependency set $\mathcal{F}$:
+\begin{align*}
+    FD_1: &\quad loan\_id \rightarrow \{applicant\_id, product\_id, guarantor\_id, principal\_amount, interest\_rate, tenure\_months, emi\_amount\} \\
+    FD_2: &\quad applicant\_id \rightarrow \{pan\_no, annual\_income, credit\_score\} \\
+    FD_3: &\quad pan\_no \rightarrow \{applicant\_id, annual\_income, credit\_score\} \\
+    FD_4: &\quad product\_id \rightarrow \{product\_name\} \\
+    FD_5: &\quad guarantor\_id \rightarrow \{guarantor\_pan\} \\
+    FD_6: &\quad \{loan\_id, installment\_no\} \rightarrow \{due\_date, balance\_after\}
 \end{align*}
 
-To identify candidate keys, we determine the attribute closure of $\alpha = \{order\_id, item\_name\}^+$ under $\mathcal{F}$:
+To identify candidate keys, we determine the attribute closure of $\alpha = \{loan\_id, installment\_no\}^+$ under $\mathcal{F}$:
 \begin{align*}
-    \alpha^{(0)} &= \{order\_id, item\_name\} \\
-    \alpha^{(1)} &= \{order\_id, item\_name, buyer\_email, buyer\_name\} \quad (\text{via } FD_1) \\
-    \alpha^{(2)} &= \{order\_id, item\_name, buyer\_email, buyer\_name, item\_price, item\_qty, seller\_name, seller\_upi\} \quad (\text{via } FD_3)
+    \alpha^{(0)} &= \{loan\_id, installment\_no\} \\
+    \alpha^{(1)} &= \{loan\_id, installment\_no, applicant\_id, product\_id, guarantor\_id, principal\_amount, interest\_rate, tenure\_months, emi\_amount\} \quad (\text{via } FD_1) \\
+    \alpha^{(2)} &= \alpha^{(1)} \cup \{pan\_no, annual\_income, credit\_score\} \quad (\text{via } FD_2) \\
+    \alpha^{(3)} &= \alpha^{(2)} \cup \{product\_name\} \quad (\text{via } FD_4) \\
+    \alpha^{(4)} &= \alpha^{(3)} \cup \{guarantor\_pan\} \quad (\text{via } FD_5) \\
+    \alpha^{(5)} &= \alpha^{(4)} \cup \{due\_date, balance\_after\} \quad (\text{via } FD_6)
 \end{align*}
-Since $\alpha^{(2)} = \mathcal{U}$, $\{order\_id, item\_name\}$ is a valid superkey. Minimal dependency analysis confirms it is the minimal candidate key.
+Since $\alpha^{(5)} = \mathcal{U}$, $\{loan\_id, installment\_no\}$ is a superkey. Removing either attribute yields a proper subset whose closure fails to determine $\mathcal{U}$. Thus, $\{loan\_id, installment\_no\}$ is the unique minimal candidate key of $LOAN\_RAW$.
 
-\paragraph{Normalization Decomposition Steps:}
+\subsubsection{Formal Normalization Decomposition (1NF to BCNF)}
+The unnormalized flat relation suffers from anomalies. The formal decomposition proceeds as follows:
 \begin{itemize}
-    \item \textbf{1NF to 2NF Decomposition:} In $\mathcal{U}$, $FD_1$ reveals a partial dependency: non-prime attribute $buyer\_email$ depends on $order\_id \subset \{order\_id, item\_name\}$. Decomposed into:
+    \item \textbf{1NF to 2NF Decomposition:} In $\mathcal{U}$, functional dependency $FD_1$ demonstrates a partial dependency: non-prime attributes (such as $applicant\_id$, $principal\_amount$) depend strictly on $loan\_id$, a proper subset of the candidate key $\{loan\_id, installment\_no\}$. We decompose $\mathcal{U}$ into:
     \begin{align*}
-        R_1(order\_id, buyer\_email, buyer\_name), \quad R_2(order\_id, item\_name, item\_price, item\_qty, seller\_name, seller\_upi)
+        R_{\text{loan\_flat}}(loan\_id, applicant\_id, pan\_no, annual\_income, credit\_score, product\_id, product\_name, interest\_rate, principal\_amount, tenure\_months, emi\_amount, guarantor\_id, guarantor\_pan) \\
+        R_{\text{schedule}}(loan\_id, installment\_no, due\_date, balance\_after) \quad [\text{Key: } \{loan\_id, installment\_no\}]
     \end{align*}
-    \item \textbf{2NF to 3NF Decomposition:} In $R_1$, $order\_id \rightarrow buyer\_email$ and $buyer\_email \rightarrow buyer\_name$ constitutes a transitive dependency. Decomposed into:
+    Both relations now satisfy Second Normal Form (2NF).
+    
+    \item \textbf{2NF to 3NF Decomposition:} In $R_{\text{loan\_flat}}$, transitive dependencies exist where non-prime attributes depend on intermediate determinants that are not candidate keys:
     \begin{align*}
-        ORDERS(order\_id, buyer\_email), \quad BUYER(buyer\_email, buyer\_name)
+        loan\_id \rightarrow applicant\_id &\quad \text{and} \quad applicant\_id \rightarrow \{pan\_no, annual\_income, credit\_score\} \\
+        loan\_id \rightarrow product\_id &\quad \text{and} \quad product\_id \rightarrow \{product\_name\} \\
+        loan\_id \rightarrow guarantor\_id &\quad \text{and} \quad guarantor\_id \rightarrow \{guarantor\_pan\}
     \end{align*}
-    \item \textbf{3NF to BCNF Decomposition:} In $R_2$, $FD_4: seller\_name \rightarrow seller\_upi$ holds where $seller\_name$ is not a superkey. Decomposed into:
+    Decomposing $R_{\text{loan\_flat}}$ to isolate these determinants:
     \begin{align*}
-        SELLER(seller\_name, seller\_upi), \quad ORDER\_ITEM(order\_id, item\_name, item\_price, item\_qty, seller\_name)
+        &APPLICANT(applicant\_id, pan\_no, annual\_income, credit\_score) \\
+        &LOAN\_PRODUCT(product\_id, product\_name) \\
+        &GUARANTOR(guarantor\_id, guarantor\_pan) \\
+        &LOAN(loan\_id, applicant\_id, product\_id, guarantor\_id, principal\_amount, interest\_rate, tenure\_months, emi\_amount)
     \end{align*}
+    Every non-prime attribute is non-transitively dependent on the primary key, satisfying 3NF.
+
+    \item \textbf{3NF to BCNF Decomposition:} A relation is in Boyce-Codd Normal Form (BCNF) if for every non-trivial functional dependency $X \rightarrow Y$, $X$ is a superkey. In $APPLICANT$, both $FD_2: applicant\_id \rightarrow \dots$ and $FD_3: pan\_no \rightarrow \dots$ hold. Because PAN numbers are legally unique across India, $pan\_no$ constitutes a candidate key. Because every determinant across all decomposed relations is a superkey, the entire schema strictly satisfies BCNF.
 \end{itemize}
-The resulting schema eliminates all update, insertion, and deletion anomalies while preserving lossless-join properties.
+This decomposition guarantees lossless join and dependency preservation while eliminating update, insertion, and deletion anomalies.
 
 \subsubsection{B+ Tree Indexing Computational Complexity}
-For a relation with $N$ rows indexed by a B+ Tree of node order $M$, the tree height $h$ and search cost are modeled as:
-$$h \le \left\lceil \log_{\lceil M/2 \rceil} \left(\frac{N+1}{2}\right) \right\rceil + 1$$
-While a sequential full-table scan requires $\mathcal{O}(N)$ page reads, B+ tree traversal bounds disk input/output operations to $\mathcal{O}(\log_{M/2} N)$. In a dataset exceeding 5,000 records, index seeks reduce page lookups from over 5,000 block reads to at most 3 block accesses.
+MySQL InnoDB implements clustered and secondary indexes using balanced multi-way search trees (B+ Trees). For a relation with $N$ records indexed by a B+ Tree of node order $M$ (maximum child pointers per node), the maximum tree height $h$ is mathematically bounded by:
+\begin{equation}
+    h \le \left\lceil \log_{\lceil M/2 \rceil} \left(\frac{N+1}{2}\right) \right\rceil + 1
+\end{equation}
+In InnoDB, a standard disk page is 16 KB ($16,384$ bytes). For an 8-byte integer key and a 6-byte child pointer, page overhead permits an internal node order $M \approx 1,000$. Assuming a conservative branch factor $B = \lceil M/2 \rceil = 100$:
+\begin{itemize}
+    \item For a repayment table with $N = 1,000,000$ historical transactions:
+    \begin{equation*}
+        h \le \left\lceil \log_{100} \left(\frac{1,000,001}{2}\right) \right\rceil + 1 = \lceil 2.85 \rceil + 1 = 3 + 1 = 4
+    \end{equation*}
+\end{itemize}
+While an unindexed sequential scan requires $\mathcal{O}(N)$ block reads (approximately $12,500$ page reads for $10^6$ rows), a B+ Tree index seek bounds disk I/O to $\mathcal{O}(\log_{M/2} N) \le 4$ block reads. Composite indexes such as \texttt{idx\_emi\_due\_status(due\_date, status)} leverage the leftmost-prefix evaluation rule, enabling high-performance range scans for daily overdue batch processing without table locks.
 
 \subsection{Proposed Solution Strategy and Implementation}
-The CampusSwap relational architecture decomposes the domain into 12 normalized entities integrated with transactional triggers, stored procedures, and composite indexes.
+The BLMS schema comprises 8 normalized entities implemented on MySQL InnoDB with enterprise declarative constraints, stored procedures, event triggers, and optimized indexes.
 
 \begin{table}[h!]
     \centering
-    \caption{Architectural Strategies and DBMS Implementation Details}
+    \caption{Core Architectural Strategies and DBMS Implementation Details}
     \vspace{2mm}
     \setstretch{1.2}
     \begin{tabular}{|l|p{10.5cm}|}
         \hline
-        \textbf{Strategy} & \textbf{Implementation Details in CampusSwap} \\ \hline
-        Subtype Specialization & USER partitioned into SELLER and BUYER using overlapping, partial foreign key hierarchies. LISTING specialized into BOOK\_DETAILS for ISBN and author semantics. \\ \hline
-        Hierarchical Categories & Self-referencing FK (\texttt{parent\_category\_id} $\rightarrow$ \texttt{category\_id}) supporting tree depth with \texttt{ON DELETE SET NULL}. \\ \hline
-        Integrity Constraints & Declarative \texttt{CHECK (price > 0)}, \texttt{CHECK (quantity >= 0)}, \texttt{CHECK (rating BETWEEN 1 AND 5)}, and strict \texttt{ENUM} status restrictions. \\ \hline
-        ACID Order Procedure & Stored procedure \texttt{place\_order()} wrapped in an explicit transaction with row-level locking (\texttt{FOR UPDATE}) and automated rollback handlers. \\ \hline
-        Event-Driven Triggers & \texttt{trg\_listing\_sold\_out} automatically updates status to SOLD; \texttt{trg\_update\_seller\_rating} aggregates ratings; \texttt{trg\_price\_audit} captures historical mutations. \\ \hline
-        Batch Lifecycle Cursor & Cursor procedure \texttt{mark\_expired\_listings()} scanning listings older than 60 days to enforce time-bound lifecycle transitions. \\ \hline
-        Indexing Architecture & B+ Tree single-column index on \texttt{LISTING(title)} and composite index on \texttt{LISTING(category\_id, status)} satisfying the leftmost-prefix rule. \\ \hline
+        \textbf{Strategy} & \textbf{Implementation Details in BLMS} \\ \hline
+        Entity Normalization & Decomposed into 8 BCNF tables: \texttt{APPLICANT}, \texttt{LOAN\_PRODUCT}, \texttt{GUARANTOR}, \texttt{LOAN}, \texttt{EMI\_SCHEDULE}, \texttt{REPAYMENT}, \texttt{DEFAULT\_LOG}, and \texttt{LOAN\_AUDIT}. \\ \hline
+        Declarative Domain Integrity & Declarative \texttt{CHECK} constraints: \texttt{annual\_income >= 0}, \texttt{credit\_score BETWEEN 300 AND 900}, \texttt{principal\_amount > 0}, \texttt{max\_amount >= min\_amount}, and strict \texttt{ENUM} domain types. \\ \hline
+        EMI Generation Procedure & Stored procedure \texttt{sp\_generate\_emi\_schedule(loan\_id)} executing within an atomic transaction, iteratively inserting $n$ amortized installments with exact principal/interest splits. \\ \hline
+        ACID Repayment Processing & Stored procedure \texttt{sp\_process\_repayment()} utilizing exclusive row locks (\texttt{SELECT ... FOR UPDATE}), preventing concurrent double-payments and adjusting installment balances atomically. \\ \hline
+        Automated Default Detection & Event trigger \texttt{trg\_check\_loan\_default} monitoring unpaid installments past 90 days, updating loan status to \texttt{'DEFAULTED'} and logging to \texttt{DEFAULT\_LOG} per RBI rules. \\ \hline
+        Batch Overdue Cursor & Procedure \texttt{sp\_scan\_overdue\_emis()} deploying a database cursor to scan pending installments where \texttt{due\_date < CURRENT\_DATE}, marking \texttt{'OVERDUE'} and computing late penalties. \\ \hline
+        Immutable Audit Triggers & \texttt{AFTER UPDATE} triggers on \texttt{LOAN} capturing mutations on critical attributes (\texttt{status}, \texttt{interest\_rate}), appending immutable entries to \texttt{LOAN\_AUDIT}. \\ \hline
+        B+ Tree Index Architecture & Clustered indexes on PKs; composite B+ tree indexes on \texttt{EMI\_SCHEDULE(due\_date, status)} and \texttt{REPAYMENT(loan\_id, payment\_date)} satisfying the leftmost-prefix rule. \\ \hline
     \end{tabular}
 \end{table}
 
 % ------------------ Section 3: Program Outcome Mapping ------------------
 
 \section{Application of Program Outcomes and Sustainability Goals}
-As per NBA SAR requirements for solving complex engineering problems incorporating sustainability, Table \ref{tab:po_mapping} outlines the alignment of CampusSwap with Program Outcomes (POs) and UN Sustainable Development Goals (SDGs).
+As per National Board of Accreditation (NBA) SAR guidelines for engineering projects, Table \ref{tab:po_mapping} demonstrates the explicit alignment of BLMS with Program Outcomes (POs) and UN Sustainable Development Goals (SDGs).
 
 \begin{table}[h!]
     \centering
     \renewcommand{\arraystretch}{1.3}
     \setlength{\tabcolsep}{7pt}
-    \caption{Mapping of POs and Targeted Sustainability Goals}
+    \caption{Mapping of Program Outcomes (POs) and Targeted Sustainability Goals}
     \label{tab:po_mapping}
     \begin{tabular}{|c|p{8.5cm}|c|}
         \hline
         \textbf{PO No.} & \textbf{Relevance to Complex Engineering Problem Solving} & \textbf{Targeted SDG} \\
         \hline
-        \textbf{PO1} & \textbf{Engineering Knowledge:} Applies relational algebra, attribute closure mathematics, and B+ tree search complexity to database modeling. & SDG 9 \\
+        \textbf{PO1} & \textbf{Engineering Knowledge:} Applies financial amortization mathematics (EMI formula derivation), relational algebra formulations, and B+ tree search complexity bounds to loan database modeling. & SDG 9 \\
         \hline
-        \textbf{PO2} & \textbf{Problem Analysis:} Evaluates anomalies in unnormalized relations, computes functional dependency closures, and structures BCNF decompositions. & SDG 9 \\
+        \textbf{PO2} & \textbf{Problem Analysis:} Evaluates update/delete anomalies in denormalized loan ledgers, determines functional dependency closures, and proves BCNF schema decomposition. & SDG 9 \\
         \hline
-        \textbf{PO3} & \textbf{Design/Development of Solutions:} Designs an ACID-compliant schema with subtype constraints, automated audit triggers, and race-free procedures. & SDG 12 \\
+        \textbf{PO3} & \textbf{Design/Development of Solutions:} Designs ACID-compliant transactional procedures, automated overdue detection triggers, and regulatory compliance logging. & SDG 8 \\
         \hline
-        \textbf{PO4} & \textbf{Investigations of Complex Problems:} Investigates concurrent race conditions via two-session simulations and benchmarks EXPLAIN execution plans on 5000+ records. & SDG 9 \\
+        \textbf{PO4} & \textbf{Investigations of Complex Problems:} Investigates concurrent race conditions (double-repayment hazards) via simulated sessions and evaluates query execution plans using \texttt{EXPLAIN}. & SDG 9 \\
         \hline
-        \textbf{PO5} & \textbf{Modern Tool Usage:} Utilizes MySQL 8.0 InnoDB engine, Python Faker synthetic data orchestration, Flask REST API framework, and Git version control. & SDG 9 \\
+        \textbf{PO5} & \textbf{Modern Tool Usage:} Utilizes MySQL 8.0 InnoDB storage engine, Python Faker for synthetic banking portfolios, Flask REST API framework, and Git version control. & SDG 9 \\
         \hline
-        \textbf{PO7} & \textbf{Environment and Sustainability:} Advances campus circular economies and textbook recycling, directly minimizing institutional paper waste. & SDG 12, 13 \\
+        \textbf{PO7} & \textbf{Environment and Sustainability:} Advances paperless banking by eliminating manual physical ledgers and supports equitable financial inclusion for underbanked borrowers. & SDG 1, 16 \\
         \hline
-        \textbf{PO11} & \textbf{Project Management and Finance:} Implements full-lifecycle engineering from conceptual E-R design to transactional financial ledgers and audits. & SDG 8, 9 \\
+        \textbf{PO11} & \textbf{Project Management and Finance:} Implements full-lifecycle engineering from conceptual E-R modeling to balance sheet reconciliation and credit risk governance. & SDG 8 \\
         \hline
-        \textbf{PO12} & \textbf{Life-Long Learning:} Demonstrates mastery over evolving database standards (SQL:2016, JSON integration, ACID microservices integration). & SDG 4 \\
+        \textbf{PO12} & \textbf{Life-Long Learning:} Demonstrates adaptability to evolving fintech regulatory mandates, RBI digital lending guidelines, and modern distributed database architectures. & SDG 8 \\
         \hline
     \end{tabular}
 \end{table}
@@ -259,39 +365,40 @@ As per NBA SAR requirements for solving complex engineering problems incorporati
 
 \section{Sustainability Integration}
 
-\subsection{Resource Utilization and Circular Economy}
-CampusSwap fundamentally addresses the resource-intensive dynamics of academic material production. Millions of textbooks, engineering manuals, and specialized calculators are printed each academic year with an average active study utility of merely four to five months. By providing a low-latency, trust-verified campus marketplace:
+\subsection{Financial Inclusion and Equitable Credit Access}
+The Bank Loan Management System directly advances social and economic sustainability by democratizing formal banking infrastructure for socio-economically diverse populations:
 \begin{itemize}
-    \item \textbf{Textbook Reusability:} Extends the operational life of physical volumes across 4--6 student generations, preventing redundant paper pulp manufacturing.
-    \item \textbf{E-Waste Mitigation:} Facilitates the resale and repair of functional scientific electronics (calculators, headphones, development boards) that would otherwise enter municipal landfills.
-    \item \textbf{Equitable Education Access (SDG 4):} Dampens the financial barrier of higher education course materials, empowering economically vulnerable students with identical learning assets.
+    \item \textbf{Financial Inclusion for Underbanked Borrowers (SDG 1):} By automating applicant onboarding and credit assessment workflows, commercial banks significantly lower operational servicing costs per account. This efficiency enables viable underwriting of small-ticket micro-loans, agricultural credit lines, and education loans for low-income applicants who are traditionally excluded from institutional lending.
+    \item \textbf{Transparent and Non-Predatory Lending (SDG 16):} Predatory lending thrives on opaque amortization methods, hidden fees, and arbitrary penalty compounding. The BLMS enforces transparent reducing-balance formulas, declarative \texttt{CHECK} constraints capping penalty interest rates, and immutable audit logging, ensuring borrower protection and regulatory adherence.
 \end{itemize}
 
-\subsection{Computational and Server Energy Efficiency}
-Database queries executed without proper indexing incur massive CPU and storage input/output (I/O) burdens. In large-scale academic cloud clusters, unoptimized full-table scans burn continuous electrical energy. 
-
-By structuring balanced B+ Tree indexes (\texttt{idx\_listing\_cat\_status} and \texttt{idx\_listing\_title}), the query execution planner avoids linear page scans ($N > 5000$), reducing CPU instruction cycles and cache churn by orders of magnitude. The corresponding reduction in compute resource consumption translates directly to lower server electrical dissipation and minimized data-center carbon footprints, supporting \textbf{SDG 13}.
+\subsection{Paperless Banking and Computational Resource Conservation}
+\begin{itemize}
+    \item \textbf{Paperless Loan Processing (SDG 8, 12):} Traditional loan management relies on reams of physical documentation—paper sanction letters, monthly installment passbooks, payment receipts, and default notices. Fully digitizing the credit lifecycle eliminates tens of thousands of paper documents per branch annually, directly curbing deforestation, industrial water consumption in paper mills, and transit emissions from document logistics.
+    \item \textbf{Computational Energy Efficiency (SDG 9, 13):} In data centers powering financial institutions, poorly optimized queries requiring repeated full-table scans consume immense electrical energy. By structuring balanced B+ Tree composite indexes (\texttt{idx\_emi\_due\_status}) and decomposing schemas to BCNF, query execution costs drop from $\mathcal{O}(N)$ to $\mathcal{O}(\log N)$. This logarithmic bound drastically diminishes CPU core utilization and disk I/O churn, curbing server heat dissipation and institutional carbon footprints.
+\end{itemize}
 
 % ------------------ Section 5: Conclusion ------------------
 
 \section{Conclusion and Future Directions}
 
 \subsection{Solution Summary}
-The CampusSwap database system demonstrates a production-grade, pedagogically defensible relational architecture for academic commerce. Through an 8-stage engineering lifecycle, the project successfully established:
+The Bank Loan Management System provides a production-grade, mathematically grounded, and rigorously normalized relational database architecture for retail banking operations. Across an 8-stage engineering lifecycle, the project delivered:
 \begin{enumerate}
-    \item An expressive Entity-Relationship model incorporating overlapping partial specialization and self-referential hierarchies.
-    \item A fully constrained, anomaly-free relational schema strictly normalized to Boyce-Codd Normal Form (BCNF).
-    \item Transactional stored procedures with strict Two-Phase Locking preventing double-allocation race conditions under peak concurrency.
-    \item Active database triggers ensuring autonomous integrity enforcement and immutable price audit logging.
-    \item A decoupled full-stack architecture coupling a Python Flask REST backend to an interactive visual query demonstration frontend.
+    \item An expressive Entity-Relationship design capturing complex credit relationships across applicants, loan products, guarantors, and repayment schedules.
+    \item An 8-table relational schema fully normalized to Boyce-Codd Normal Form (BCNF), eliminating redundancy and anomaly vectors.
+    \item Robust declarative integrity constraints, including credit score bounds ($[300, 900]$), positive principal checks, and strict enumerated statuses.
+    \item Atomic stored procedures (\texttt{sp\_generate\_emi\_schedule}, \texttt{sp\_process\_repayment}) guaranteeing ACID transactions and preventing concurrency race anomalies under Two-Phase Locking.
+    \item Active database triggers and cursors automating RBI-compliant default classification, late penalty computation, and immutable audit tracking.
+    \item A decoupled full-stack implementation connecting a Python Flask REST API service to an interactive web demonstration dashboard.
 \end{enumerate}
 
 \subsection{Future Scope}
-Future research and systems engineering enhancements will focus on:
+Future systems engineering enhancements will target:
 \begin{itemize}
-    \item \textbf{Distributed Database Sharding:} Horizontally partitioning listings across multi-campus collegiate clusters using consistent hashing algorithms.
-    \item \textbf{In-Memory Inverted Caching:} Deploying Redis cache clusters for sub-millisecond retrieval of hot, frequently visited marketplace categories.
-    \item \textbf{AI-Driven Academic Syllabus Matching:} Integrating vector embeddings to autonomously match student enrolled course syllabi with listed textbook editions.
+    \item \textbf{Machine Learning Credit Risk Scoring:} Integrating gradient-boosted decision tree models (XGBoost/LightGBM) directly into the underwriting pipeline to dynamically evaluate non-traditional borrower signals.
+    \item \textbf{Consortium Blockchain Audit Ledger:} Migrating \texttt{LOAN\_AUDIT} records to a distributed Hyperledger Fabric network to enable tamper-proof inter-bank credit registries and eliminate cross-institutional default fraud.
+    \item \textbf{High-Throughput Stream Processing:} Integrating Apache Kafka with distributed MySQL replicas to handle high-frequency UPI loan micro-repayments with sub-millisecond latencies.
 \end{itemize}
 
 % ------------------ Section 6: References ------------------
@@ -302,7 +409,7 @@ Future research and systems engineering enhancements will focus on:
     \bibitem{ramakrishnan} R. Ramakrishnan and J. Gehrke, \textit{Database Management Systems}, 3rd Edition, McGraw-Hill, 2003.
     \bibitem{codd} E. F. Codd, "A Relational Model of Data for Large Shared Data Banks," \textit{Communications of the ACM}, Vol. 13, No. 6, pp. 377--387, 1970.
     \bibitem{mysql_manual} Oracle Corporation, \textit{MySQL 8.0 Reference Manual: InnoDB Storage Engine and Transaction Model}, Oracle Docs, 2024.
-    \bibitem{bernstein} P. A. Bernstein and E. Newcomer, \textit{Principles of Transaction Processing}, 2nd Edition, Morgan Kaufmann, 2009.
+    \bibitem{rbi_guidelines} Reserve Bank of India, \textit{Master Circular - Prudential Norms on Income Recognition, Asset Classification and Provisioning Pertaining to Advances}, RBI/2023-24/08, RBI Guidelines, 2024.
 \end{thebibliography}
 
 \end{document}

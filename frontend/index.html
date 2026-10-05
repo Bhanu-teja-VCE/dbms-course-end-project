@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CampusSwap — Student Marketplace</title>
+    <title>LoanFlow — Bank Loan Management & Risk Assessment</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
@@ -16,21 +16,22 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="#" class="logo">
-                <span class="logo-icon">⟲</span>
-                <span>Campus<strong>Swap</strong></span>
+                <span class="logo-icon">🏦</span>
+                <span>Loan<strong>Flow</strong></span>
             </a>
             <div class="nav-links">
-                <a href="#listings" class="nav-link">Browse</a>
-                <a href="#categories" class="nav-link">Categories</a>
-                <a href="#requests" class="nav-link">Requests</a>
+                <a href="#loans" class="nav-link">Active Loans</a>
+                <a href="#calculator" class="nav-link">EMI Calculator</a>
+                <a href="#applicants" class="nav-link">Borrowers</a>
+                <a href="#analytics" class="nav-link">Risk & Portfolio</a>
                 <a href="#" class="nav-link" id="howItWorksBtn">
                     <span class="pulse-dot"></span>
                     How It Works
                 </a>
             </div>
             <div class="nav-actions">
-                <button class="btn btn-outline" id="loginBtn">Log In</button>
-                <button class="btn btn-primary">Sell Now</button>
+                <button class="btn btn-outline" id="loginBtn">Portal Login</button>
+                <button class="btn btn-primary" id="applyLoanBtn">Apply for Loan</button>
             </div>
         </div>
     </nav>
@@ -43,146 +44,199 @@
             <div class="shape shape-3"></div>
         </div>
         <div class="hero-content">
-            <span class="hero-badge">🎓 Built by Students, for Students</span>
-            <h1>Buy & Sell Campus<br><span class="gradient-text">Essentials</span></h1>
-            <p class="hero-subtitle">Textbooks, electronics, sports gear — everything your seniors left behind, now at prices your pocket loves.</p>
+            <span class="hero-badge">💳 Bank Loan Management & NPA Risk Engine</span>
+            <h1>Intelligent Loan Lifecycle &<br><span class="gradient-text">EMI Repayment Engine</span></h1>
+            <p class="hero-subtitle">Comprehensive relational database handling loan origination, reducing-balance EMI schedules, automated penalty processing, and RBI-compliant default detection.</p>
             <div class="hero-search">
-                <input type="text" placeholder="Search for 'Data Structures', 'Calculator', 'Cricket Bat'..." id="searchInput">
+                <input type="text" placeholder="Search by Applicant Name, PAN, Loan ID, or Product Type..." id="searchInput">
                 <button class="btn btn-primary btn-search">Search</button>
             </div>
             <div class="hero-stats">
                 <div class="stat">
-                    <span class="stat-number">500+</span>
-                    <span class="stat-label">Listings</span>
+                    <span class="stat-number">₹4.2Cr+</span>
+                    <span class="stat-label">Disbursed</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-number">100+</span>
-                    <span class="stat-label">Students</span>
+                    <span class="stat-number">120+</span>
+                    <span class="stat-label">Total Loans</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-number">15</span>
-                    <span class="stat-label">Categories</span>
+                    <span class="stat-number">98.4%</span>
+                    <span class="stat-label">Collection Rate</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-number">₹50-5K</span>
-                    <span class="stat-label">Price Range</span>
+                    <span class="stat-number">7</span>
+                    <span class="stat-label">Loan Products</span>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- ========== CATEGORIES ========== -->
+    <!-- ========== LOAN PRODUCTS & PORTFOLIOS ========== -->
     <section class="section" id="categories">
         <div class="container">
-            <h2 class="section-title">Browse by Category</h2>
-            <p class="section-subtitle">Self-referencing category tree — sub-categories link back to the same table</p>
+            <h2 class="section-title">Loan Product Portfolios</h2>
+            <p class="section-subtitle">Structured lending categories with interest rate bands, tenures, and penalty rules</p>
             <div class="categories-grid">
-                <div class="category-card" data-category="books">
-                    <div class="category-icon">📚</div>
-                    <h3>Books</h3>
-                    <span class="category-count">200+ listings</span>
+                <div class="category-card" data-category="home">
+                    <div class="category-icon">🏠</div>
+                    <h3>Home Loans</h3>
+                    <span class="category-count">8.50% p.a. · Up to 30 Yrs</span>
                     <div class="sub-categories">
-                        <span class="sub-tag">Engineering</span>
-                        <span class="sub-tag">Medical</span>
-                        <span class="sub-tag">Fiction</span>
+                        <span class="sub-tag">Affordable Housing</span>
+                        <span class="sub-tag">Plot Purchase</span>
                     </div>
                 </div>
-                <div class="category-card" data-category="electronics">
-                    <div class="category-icon">💻</div>
-                    <h3>Electronics</h3>
-                    <span class="category-count">80+ listings</span>
+                <div class="category-card" data-category="personal">
+                    <div class="category-icon">💼</div>
+                    <h3>Personal Loans</h3>
+                    <span class="category-count">12.00% p.a. · Unsecured</span>
                     <div class="sub-categories">
-                        <span class="sub-tag">Calculators</span>
-                        <span class="sub-tag">Earphones</span>
+                        <span class="sub-tag">Salaried</span>
+                        <span class="sub-tag">Medical / Emergency</span>
                     </div>
                 </div>
-                <div class="category-card" data-category="sports">
-                    <div class="category-icon">🏏</div>
-                    <h3>Sports</h3>
-                    <span class="category-count">45+ listings</span>
+                <div class="category-card" data-category="vehicle">
+                    <div class="category-icon">🚗</div>
+                    <h3>Vehicle Loans</h3>
+                    <span class="category-count">9.50% p.a. · Up to 7 Yrs</span>
                     <div class="sub-categories">
-                        <span class="sub-tag">Cricket</span>
-                        <span class="sub-tag">Badminton</span>
+                        <span class="sub-tag">Four Wheeler</span>
+                        <span class="sub-tag">Commercial EV</span>
                     </div>
                 </div>
-                <div class="category-card" data-category="stationery">
-                    <div class="category-icon">✏️</div>
-                    <h3>Stationery</h3>
-                    <span class="category-count">60+ listings</span>
+                <div class="category-card" data-category="education">
+                    <div class="category-icon">🎓</div>
+                    <h3>Education Loans</h3>
+                    <span class="category-count">7.00% p.a. · Moratorium Option</span>
+                    <div class="sub-categories">
+                        <span class="sub-tag">Domestic Higher Ed</span>
+                        <span class="sub-tag">Overseas Study</span>
+                    </div>
                 </div>
-                <div class="category-card" data-category="clothing">
-                    <div class="category-icon">👕</div>
-                    <h3>Clothing</h3>
-                    <span class="category-count">35+ listings</span>
+                <div class="category-card" data-category="business">
+                    <div class="category-icon">🏢</div>
+                    <h3>Business Loans</h3>
+                    <span class="category-count">11.00% p.a. · Working Capital</span>
+                    <div class="sub-categories">
+                        <span class="sub-tag">MSME Equipment</span>
+                        <span class="sub-tag">Trade Finance</span>
+                    </div>
                 </div>
-                <div class="category-card" data-category="furniture">
-                    <div class="category-icon">🪑</div>
-                    <h3>Furniture</h3>
-                    <span class="category-count">25+ listings</span>
+                <div class="category-card" data-category="gold">
+                    <div class="category-icon">💰</div>
+                    <h3>Gold Loans</h3>
+                    <span class="category-count">8.00% p.a. · Instant Disbursal</span>
+                    <div class="sub-categories">
+                        <span class="sub-tag">Bullet Repayment</span>
+                        <span class="sub-tag">Overdraft</span>
+                    </div>
                 </div>
-                <div class="category-card" data-category="accessories">
-                    <div class="category-icon">🎒</div>
-                    <h3>Accessories</h3>
-                    <span class="category-count">55+ listings</span>
+                <div class="category-card" data-category="agriculture">
+                    <div class="category-icon">🌾</div>
+                    <h3>Agriculture Loans</h3>
+                    <span class="category-count">6.00% p.a. · Subsidized Interest</span>
+                    <div class="sub-categories">
+                        <span class="sub-tag">Crop Production</span>
+                        <span class="sub-tag">Farm Machinery</span>
+                    </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- ========== FEATURED LISTINGS ========== -->
-    <section class="section section-alt" id="listings">
+    <!-- ========== ACTIVE LOANS VIEW ========== -->
+    <section class="section section-alt" id="loans">
         <div class="container">
-            <h2 class="section-title">Featured Listings</h2>
-            <p class="section-subtitle">Fresh from the available_listings_view — a SQL VIEW that joins 3 tables in one query</p>
-            <div class="listings-grid" id="listingsGrid">
+            <h2 class="section-title">Active Loan Disbursals & Repayment Status</h2>
+            <p class="section-subtitle">Real-time view populated from LOAN and EMI_SCHEDULE with live status badges</p>
+            <div class="listings-grid" id="loansGrid">
                 <!-- Generated by JS -->
             </div>
         </div>
     </section>
 
-    <!-- ========== REQUESTS ========== -->
-    <section class="section" id="requests">
+    <!-- ========== EMI CALCULATOR SECTION ========== -->
+    <section class="section" id="calculator">
         <div class="container">
-            <h2 class="section-title">Wanted Requests</h2>
-            <p class="section-subtitle">Can't find what you need? Post a request!</p>
-            <div class="requests-list" id="requestsList">
+            <h2 class="section-title">Interactive EMI Amortization Calculator</h2>
+            <p class="section-subtitle">Computes standard reducing-balance EMI: E = P · r · (1+r)ⁿ / ((1+r)ⁿ − 1)</p>
+            <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; max-width: 850px; margin: 0 auto;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 24px;">
+                    <div>
+                        <label style="display:block; font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">Principal Amount (₹)</label>
+                        <input type="number" id="calcPrincipal" value="500000" min="10000" step="10000" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:white;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">Annual Interest Rate (%)</label>
+                        <input type="number" id="calcRate" value="9.5" min="1" max="30" step="0.1" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:white;">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">Tenure (Months)</label>
+                        <input type="number" id="calcTenure" value="36" min="3" max="360" step="1" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:white;">
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; padding:20px; background:rgba(108,92,231,0.08); border-radius:10px; border:1px solid rgba(108,92,231,0.2);">
+                    <div>
+                        <span style="font-size:0.85rem; color:var(--text-muted); display:block;">Monthly Installment (EMI)</span>
+                        <span id="calcEmiResult" style="font-size:1.8rem; font-weight:800; color:var(--primary);">₹16,016</span>
+                    </div>
+                    <div>
+                        <span style="font-size:0.85rem; color:var(--text-muted); display:block;">Total Interest Payable</span>
+                        <span id="calcTotalInterest" style="font-size:1.2rem; font-weight:700; color:#FDCB6E;">₹76,576</span>
+                    </div>
+                    <div>
+                        <span style="font-size:0.85rem; color:var(--text-muted); display:block;">Total Payable Amount</span>
+                        <span id="calcTotalAmount" style="font-size:1.2rem; font-weight:700; color:#00B894;">₹5,76,576</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========== BORROWER APPLICANTS DIRECTORY ========== -->
+    <section class="section" id="applicants">
+        <div class="container">
+            <h2 class="section-title">Borrower Directory & Credit Ratings</h2>
+            <p class="section-subtitle">Verified KYC applicant profiles showing CIBIL score checks, employment details, and active liabilities</p>
+            <div class="requests-list" id="applicantsList">
                 <!-- Generated by JS -->
             </div>
         </div>
     </section>
 
-    <!-- ========== SELLER DASHBOARD PREVIEW ========== -->
-    <section class="section section-alt" id="dashboard">
+    <!-- ========== PORTFOLIO & RISK DASHBOARD ========== -->
+    <section class="section section-alt" id="analytics">
         <div class="container">
-            <h2 class="section-title">Seller Dashboard</h2>
-            <p class="section-subtitle">Powered by seller_dashboard_view — aggregates revenue, ratings, and listing counts</p>
+            <h2 class="section-title">Credit Risk & Portfolio Analytics</h2>
+            <p class="section-subtitle">Live aggregation views monitoring Non-Performing Assets (NPAs), overdue exposure, and collection efficiency</p>
             <div class="dashboard-grid">
                 <div class="dashboard-card">
                     <div class="dashboard-icon">📊</div>
                     <div class="dashboard-info">
-                        <span class="dashboard-value">₹15,420</span>
-                        <span class="dashboard-label">Total Revenue</span>
+                        <span class="dashboard-value">₹3.82 Cr</span>
+                        <span class="dashboard-label">Total Outstanding</span>
                     </div>
                 </div>
                 <div class="dashboard-card">
-                    <div class="dashboard-icon">⭐</div>
+                    <div class="dashboard-icon">⚠️</div>
                     <div class="dashboard-info">
-                        <span class="dashboard-value">4.3</span>
-                        <span class="dashboard-label">Avg Rating</span>
+                        <span class="dashboard-value">₹14.6 L</span>
+                        <span class="dashboard-label">Overdue Exposure</span>
                     </div>
                 </div>
                 <div class="dashboard-card">
-                    <div class="dashboard-icon">📦</div>
+                    <div class="dashboard-icon">🚨</div>
                     <div class="dashboard-info">
-                        <span class="dashboard-value">12</span>
-                        <span class="dashboard-label">Active Listings</span>
+                        <span class="dashboard-value">6 Loans</span>
+                        <span class="dashboard-label">Defaulters (90+ Days)</span>
                     </div>
                 </div>
                 <div class="dashboard-card">
-                    <div class="dashboard-icon">✅</div>
+                    <div class="dashboard-icon">🛡️</div>
                     <div class="dashboard-info">
-                        <span class="dashboard-value">8</span>
-                        <span class="dashboard-label">Items Sold</span>
+                        <span class="dashboard-value">98.2%</span>
+                        <span class="dashboard-label">On-Time Recovery</span>
                     </div>
                 </div>
             </div>
@@ -193,16 +247,16 @@
     <div class="modal-overlay" id="modalOverlay">
         <div class="modal">
             <div class="modal-header">
-                <h2>🔍 How It Works — The SQL Behind CampusSwap</h2>
+                <h2>🔍 How It Works — The SQL Behind LoanFlow</h2>
                 <button class="modal-close" id="modalClose">&times;</button>
             </div>
             <div class="modal-tabs">
-                <button class="tab active" data-tab="schema">Schema</button>
-                <button class="tab" data-tab="queries">Queries</button>
-                <button class="tab" data-tab="normalization">Normalization</button>
-                <button class="tab" data-tab="procedures">Procedures</button>
-                <button class="tab" data-tab="transactions">Transactions</button>
-                <button class="tab" data-tab="indexes">Indexes</button>
+                <button class="tab active" data-tab="schema">Schema (8 Tables)</button>
+                <button class="tab" data-tab="queries">Unit II Queries</button>
+                <button class="tab" data-tab="normalization">1NF→BCNF</button>
+                <button class="tab" data-tab="procedures">EMI Procedures</button>
+                <button class="tab" data-tab="transactions">ACID & Locking</button>
+                <button class="tab" data-tab="indexes">B+ Tree Indexes</button>
                 <button class="tab" data-tab="er">ER Design</button>
             </div>
             <div class="modal-body" id="modalBody">
@@ -215,7 +269,7 @@
     <div class="modal-overlay" id="loginOverlay">
         <div class="modal login-modal">
             <div class="modal-header">
-                <h2 id="loginModalTitle">🔐 Student Login</h2>
+                <h2 id="loginModalTitle">🔐 Bank Officer Login</h2>
                 <button class="modal-close" id="loginClose">&times;</button>
             </div>
             <div class="modal-body" id="loginBody">
@@ -224,56 +278,59 @@
         </div>
     </div>
 
-    <!-- ========== SELL MODAL ========== -->
+    <!-- ========== APPLY LOAN MODAL ========== -->
     <div class="modal-overlay" id="sellOverlay">
         <div class="modal login-modal">
             <div class="modal-header">
-                <h2>🏷️ Sell an Item</h2>
+                <h2>📑 New Loan Origination & Disbursal</h2>
                 <button class="modal-close" id="sellClose">&times;</button>
             </div>
             <div class="modal-body" id="sellBody">
-                <form class="login-form" id="sellForm">
+                <form class="login-form" id="loanApplyForm">
                     <div>
-                        <label>Item Title *</label>
-                        <input type="text" id="sellTitle" placeholder="e.g. Database Systems by Navathe 7th Ed" required>
+                        <label>Applicant *</label>
+                        <select id="loanApplicantSelect" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:white;">
+                            <option value="1">Rajesh Kumar (PAN: ABCPR1234E · CIBIL: 780)</option>
+                            <option value="2">Sunita Sharma (PAN: BCDPS5678F · CIBIL: 740)</option>
+                            <option value="3">Amitabh Verma (PAN: CDEPA9012G · CIBIL: 690)</option>
+                            <option value="4">Pooja Iyer (PAN: DEFPP3456H · CIBIL: 810)</option>
+                        </select>
                     </div>
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                         <div>
-                            <label>Category *</label>
-                            <select id="sellCategory">
-                                <option value="1">Books (Engineering)</option>
-                                <option value="2">Books (Medical)</option>
-                                <option value="4">Electronics</option>
-                                <option value="6">Sports Gear</option>
-                                <option value="8">Stationery</option>
-                                <option value="9">Clothing</option>
-                                <option value="10">Furniture</option>
+                            <label>Loan Product *</label>
+                            <select id="loanProductSelect" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:white;">
+                                <option value="1">Home Loan (8.50%)</option>
+                                <option value="2">Personal Loan (12.00%)</option>
+                                <option value="3">Vehicle Loan (9.50%)</option>
+                                <option value="4">Education Loan (7.00%)</option>
+                                <option value="5">Business Loan (11.00%)</option>
+                                <option value="6">Gold Loan (8.00%)</option>
                             </select>
                         </div>
                         <div>
-                            <label>Condition *</label>
-                            <select id="sellCondition">
-                                <option value="LIKE_NEW">Like New</option>
-                                <option value="GOOD" selected>Good</option>
-                                <option value="FAIR">Fair</option>
-                                <option value="NEW">Brand New</option>
-                            </select>
+                            <label>Tenure (Months) *</label>
+                            <input type="number" id="loanTenureInput" min="6" max="360" value="36" required>
                         </div>
                     </div>
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                         <div>
-                            <label>Price (₹) *</label>
-                            <input type="number" id="sellPrice" min="10" placeholder="350" required>
+                            <label>Sanctioned Principal (₹) *</label>
+                            <input type="number" id="loanPrincipalInput" min="20000" step="5000" value="300000" required>
                         </div>
                         <div>
-                            <label>Quantity *</label>
-                            <input type="number" id="sellQty" min="1" value="1" required>
+                            <label>Guarantor (Optional)</label>
+                            <select id="loanGuarantorSelect" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:rgba(255,255,255,0.05); color:white;">
+                                <option value="">None (Unsecured / Self-Secured)</option>
+                                <option value="1">Vikramaditya Rao (Father · ₹12L Income)</option>
+                                <option value="2">Suresh Nair (Colleague · ₹9L Income)</option>
+                            </select>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary" style="width:100%">Post Listing</button>
+                    <button type="submit" class="btn btn-primary" style="width:100%">Approve & Disburse Loan</button>
                     <div class="concept-box" style="margin-top:8px;">
                         <p style="margin-bottom:0; color:var(--text); font-size:0.82rem;">
-                            <strong>🔍 SQL Behind Listing:</strong> Executes <code>INSERT INTO LISTING (...)</code> with CHECK constraints (<code>price > 0</code>, <code>quantity >= 0</code>). If the user isn't in <code>SELLER</code> yet, specialization rule creates a <code>SELLER</code> row automatically.
+                            <strong>🔍 SQL Behind Disbursal:</strong> Runs <code>START TRANSACTION</code>, inserts into <code>LOAN</code> with CHECK constraints, executes <code>CALL generate_emi_schedule(loan_id)</code> to generate all amortization rows with exact interest/principal split, and registers audit logs.
                         </p>
                     </div>
                 </form>
@@ -286,25 +343,25 @@
         <div class="container">
             <div class="footer-content">
                 <div class="footer-brand">
-                    <span class="logo-icon">⟲</span>
-                    <span>Campus<strong>Swap</strong></span>
-                    <p>A DBMS Course Project — Built with MySQL, Python (Faker), and ❤️</p>
+                    <span class="logo-icon">🏦</span>
+                    <span>Loan<strong>Flow</strong></span>
+                    <p>Bank Loan Management System — Course End Project | A9511 Database Management Systems</p>
                 </div>
                 <div class="footer-links">
-                    <h4>Project</h4>
-                    <a href="https://github.com" target="_blank">GitHub Repo</a>
-                    <a href="#" id="footerHowItWorks">How It Works</a>
-                    <a href="#">ER Diagram</a>
+                    <h4>Artifacts</h4>
+                    <a href="#" id="footerHowItWorks">SQL Implementation Guide</a>
+                    <a href="../docs/report.tex" target="_blank">LaTeX Course Report</a>
+                    <a href="../sql/schema.sql" target="_blank">Database Schema</a>
                 </div>
                 <div class="footer-links">
-                    <h4>Tech Stack</h4>
-                    <p>MySQL 8.0</p>
-                    <p>Python + Faker</p>
-                    <p>HTML/CSS/JS</p>
+                    <h4>Engine Specs</h4>
+                    <p>MySQL 8.0 (InnoDB)</p>
+                    <p>Python 3.10 + Faker</p>
+                    <p>Flask RESTful Backend</p>
                 </div>
             </div>
             <div class="footer-bottom">
-                <p>&copy; 2026 CampusSwap — DBMS Course Project | B.Tech CSE</p>
+                <p>&copy; 2026 LoanFlow — DBMS Course Project | Department of Computer Science & Engineering</p>
             </div>
         </div>
     </footer>
