@@ -231,13 +231,12 @@ Despite widespread modernization of user interfaces, legacy and manual sub-syste
 \end{enumerate}
 
 \subsection{Objectives of the Bank Loan Management System (BLMS)}
-The primary engineering objective of this project is to architect, normalize, implement, and benchmark an enterprise-grade database management system that addresses these operational failures:
+The primary engineering objective of this project is to architect, normalize, implement, and benchmark an enterprise-grade database management system that addresses operational and computational vulnerabilities in retail lending:
 \begin{itemize}
-    \item Design an 8-table relational schema normalized to Boyce-Codd Normal Form (BCNF) that models applicants, loan products, guarantors, loan contracts, reducing-balance EMI schedules, repayments, defaults, and forensic audits.
-    \item Develop an automated reducing-balance EMI schedule generator via stored procedures that recalculates declining principal and interest portions with an exact terminal zero balance.
-    \item Implement an atomic repayment processing stored procedure that leverages pessimistic locking (\texttt{SELECT ... FOR UPDATE}) to eliminate double-payment race conditions.
-    \item Create automated triggers that enforce late-payment penalty accrual, trigger default logging when delinquent installments reach the 90-day threshold, and record changes in a dedicated audit log.
-    \item Implement multi-table analytical queries, analytical views, and composite B+ tree indexes that provide sub-millisecond query latencies across portfolios.
+    \item \textbf{BCNF Relational Schema Design:} Architect an 8-table relational database strictly normalized to Boyce-Codd Normal Form (BCNF) that models the complete credit lifecycle while eliminating insertion, update, and deletion anomalies.
+    \item \textbf{Automated Reducing-Balance Amortization Engine:} Develop stored procedures that dynamically compute monthly installments ($E$) and accurately split payments into principal and interest components with exact zero terminal balance reconciliation ($B_n \equiv 0.00$).
+    \item \textbf{ACID Repayment Processing with Concurrency Control:} Implement transactional settlement procedures utilizing pessimistic row-level locking (\texttt{SELECT ... FOR UPDATE}) and reactive event triggers to eliminate race conditions, automate late-penalty assessments, and maintain forensic audit logs.
+    \item \textbf{Delinquency Tracking and Performance Optimization:} Formulate multi-table analytical queries under RBI 90-day NPA prudential norms, backed by composite B+ Tree indexing to achieve sub-millisecond query response times across large portfolios.
 \end{itemize}
 
 \subsection{Alignment with United Nations Sustainable Development Goals (SDGs)}
